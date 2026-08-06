@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(py --version)",
+      "Bash(py -c \"import sys; print\\(sys.executable\\)\")",
+      "Bash(conda info *)",
+      "Bash(/c/Users/75806/.conda/envs/LawTrust/python.exe --version)",
+      "Bash(/c/Users/75806/.conda/envs/LawTrust/python.exe -m py_compile src/config.py src/llm/api_client.py src/llm/qwen_model.py src/uncertainty/logits_entropy.py)",
+      "Bash(/c/Users/75806/.conda/envs/LawTrust/python.exe -c ' *)",
+      "Bash(/c/Users/75806/.conda/envs/LawTrust/python.exe -m pip install 'openai>=1.35.0' 'python-dotenv>=1.0.0')",
+      "Bash(iconv -f UTF-8 -t GBK)",
+      "Bash(mv /tmp/ss.bat start_server.bat)",
+      "Bash(sed '/chcp 65001 >nul/d' start_tunnel.bat)",
+      "Bash(mv /tmp/st.bat start_tunnel.bat)",
+      "Bash(cmd //c 'D:/MyProjects/LawTrust/_verify_tmp.bat')",
+      "Bash(cmd //c 'call D:\\\\MyProjects\\\\LawTrust\\\\start_server.bat')",
+      "Bash(echo \"=== exit: $? ===\")",
+      "Bash(cmd //c 'call D:\\\\MyProjects\\\\LawTrust\\\\_verify_tmp.bat')",
+      "Bash(mkdir -p legacy)",
+      "Bash(mv index.html legacy/index.html)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(/c/Users/75806/.conda/envs/LawTrust/python.exe -u scripts/run_server.py > /tmp/lawtrust_server.log 2>&1 & *)"
+    ],
+    "additionalDirectories": [
+      "\\tmp"
+    ]
+  }
+}

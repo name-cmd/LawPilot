@@ -1,0 +1,125 @@
+================================================================================
+                        法信通 LawTrust — 修改日志
+================================================================================
+
+规则：每次修改功能或修复 Bug 后，按以下格式在文件末尾追加一条记录。
+
+--------------------------------------------------------------------------------
+===== YYYY-MM-DD =====
+类型：新增功能 / 修复 / 优化
+内容：一句话说明改动
+涉及文件：xxx.py, yyy.html
+验证：说明验证方式（命令或操作步骤）
+--------------------------------------------------------------------------------
+===== 2026-08-04 =====
+类型：新增功能
+内容：LLM 双模式改造——默认走阿里云百炼 qwen3.7-plus API（OpenAI 兼容），保留本地 Qwen2.5-7B 推理可切换（LLM_PROVIDER=local）；新增 api_client.py（重试/超时/流式解析/错误分类）、config 新增 API 配置项、.env 管理 DASHSCOPE_API_KEY；bge/NLI 小模型保持本地，API 模式无需 GPU
+涉及文件：src/config.py, src/llm/api_client.py, src/llm/qwen_model.py, src/uncertainty/logits_entropy.py, requirements.txt, .env.example, .gitignore
+验证：python scripts/demo.py --query "劳动合同解除需要提前多少天通知？"（API 模式输出三段式回答+引用核验）；LLM_PROVIDER=local 回归本地模式；python scripts/run_server.py 浏览器流式问答
+--------------------------------------------------------------------------------
+===== 2026-08-04 =====
+类型：修复
+内容：demo.py 在 Windows cmd（GBK 终端）打印 ✓/✗ 等 Unicode 字符时 UnicodeEncodeError 崩溃，改为 stdout/stderr 按 UTF-8 输出（errors=replace 兜底）；核验-重生成闭环验证通过（API 模式自动修正 1 次）
+涉及文件：scripts/demo.py
+验证：python scripts/demo.py --query "劳动合同解除需要提前多少天通知？" 完整输出引用核验与六维可信评估，不再崩溃
+--------------------------------------------------------------------------------
+===== 2026-08-04 =====
+类型：新增功能
+内容：阶段九一键部署与团队测试——新增 start_server.bat（检查依赖/知识库/API Key/小模型后启动服务）与 start_tunnel.bat（检测 cpolar/ngrok 自动建隧道，未安装则打印教程）；前端同源架构确认（相对路径 fetch + WebSocket 自动 wss），测试人员零安装仅需浏览器访问公网 URL；不实施指南 9.4 client_connect.bat 与 9.5 配置管理（同源架构不需要）
+涉及文件：start_server.bat, start_tunnel.bat, README.md, CLAUDE.md, docs/法信通_LawTrust_项目介绍.txt
+验证：双击 start_server.bat 启动服务后浏览器 localhost:6006 登录；安装 cpolar 后双击 start_tunnel.bat，手机流量访问公网 URL 提问（流式回答 + 引用核验面板更新）
+--------------------------------------------------------------------------------
+===== 2026-08-05 =====
+类型：新增功能
+内容：前端架构迁移 M0——搭建 Vite + Vue 3 (script setup) + TypeScript + Tailwind CSS v4 + Naive UI + Pinia 工程骨架；旧单文件 index.html 归档至 web/frontend/legacy/（可回退）；完成设计系统（品牌蓝 @theme 令牌 + 亮暗双主题，settings store 一键联动 Tailwind 与 Naive UI darkTheme）；三栏布局骨架（AppHeader/SessionSidebar/DetailPanel）+ 登录页静态版；后端静态挂载改为三级回退（dist → legacy → frontend）；生产 base 配置 /ui/ 解决资源 404
+涉及文件：web/frontend/（package.json, vite.config.ts, index.html, src/* 全部新文件）, web/backend/main.py, docs/修改日志.txt
+验证：npm run build 零类型错误；后端 6006 服务 /ui/ 返回新前端（JS/CSS 资源 200）；/figure/sign.png 200；npm run dev 起 5173，/api 代理连通 /api/health 返回 ok；暗色切换按钮可用
+===== 2026-08-05 =====
+类型：新增功能
+内容：前端架构迁移 M1——完成 API 层（client.ts 错误归一三种 detail 形态 / types.ts 与后端 schemas.py 对齐 / auth/chat/misc 接口封装）、auth store（登录态持久化 lawtrust_auth_v2 + v1 数据静默迁移）、sessions store（会话/消息 CRUD + 按用户名隔离持久化 + v1 迁移 + 自动标题）、useChatStream（SSE 解析 + 失败自动降级 /api/chat + AbortController 取消）、useVerificationWS（核验推送连接管理）、登录页完整化（协议弹窗 + 路由守卫 + 刷新保持登录）、ChatView 问答全流程（check-input 三分支：正常/隐私确认弹窗/安全拒答 + 流式打字光标 + Markdown 章节渲染 + 消息操作栏占位）、MarkdownRenderer（markdown-it + DOMPurify 双保险）
+涉及文件：web/frontend/src/（api/*, stores/*, composables/*, components/chat/*, components/common/MarkdownRenderer.vue, views/*, utils/*, router/index.ts, App.vue, main.ts）
+验证：npm run build 零类型错误；dev 联调全链路——登录 root/123456 返回 token、check-input 正常/含手机号(needs_privacy_confirm)/伪造合同(refused) 三分支正确、/api/chat/stream 流式事件序列 meta→124×token→done 完整
+===== 2026-08-05 =====
+类型：新增功能
+内容：前端架构迁移 M2——会话管理完整化：侧栏会话列表支持重命名（RenameModal 弹窗）、删除（n-popconfirm 确认）、清空所有会话（n-dialog 警告确认）、会话时间显示（今天/昨天/日期）、AI 消息标题行（法信通 + TrustBadge 可信分角标：核验中呼吸点 → 流式快速评分 → 完成三色徽章（高/中/低）+ 废止法条警告）；sessions store 持久化改为 userScopedStorage 自定义 storage（解决 pinia-plugin-persistedstate v4 key 只求值一次导致多用户名 key 不更新的问题）
+涉及文件：web/frontend/src/components/layout/SessionSidebar.vue, web/frontend/src/components/chat/ChatMessage.vue, web/frontend/src/components/chat/TrustBadge.vue, web/frontend/src/components/common/RenameModal.vue, web/frontend/src/stores/sessions.ts, web/frontend/src/utils/answer.ts
+验证：npm run build 零类型错误（vue-tsc 全量检查）
+===== 2026-08-05 =====
+类型：新增功能
+内容：前端架构迁移 M3——右侧详情面板完整化：新增 detailPanel store（selectedMsgId/activeTab/isOpen，不持久化，meta 直接引用 sessions 消息对象，WS 推送自动刷新面板）；点击 AI 法律类回答气泡选中/取消（选中高亮边框）；可信评估面板（SVG 总分环 + 等级徽章 + 建议 + 弱维度标签 + 加权贡献分解条 + ECharts 雷达图（按需引入 echarts/core，暗色主题适配，点击维度展开审计）+ 六维列表（展开态：核验状态/摘要/检查 chips/公式审计/跳转引用核验按钮/完整审计说明折叠））；法条溯源面板（法条卡片 + 相关度百分比 + 现行有效/已废止标签（废止标红 + 参见新法）+ 展开全文）；引用核验面板（核验中提示 → 显式引用对比卡片（模型论述摘录 vs 法条对照原文 + 裁决/吻合度/是否在检索结果内）+ 隐性论断（有法律支撑/支撑不足）+ 汇总说明 + 自动修正次数）；移动端抽屉化（桌面 xl 常驻侧栏，移动端 n-drawer 抽屉 + 顶栏 📊 入口按钮）
+涉及文件：web/frontend/src/stores/detailPanel.ts, web/frontend/src/components/detail/*（DetailBody/TrustEvalPanel/RadarChart/ArticleTracePanel/CitationVerificationPanel）, web/frontend/src/components/layout/DetailPanel.vue, web/frontend/src/components/chat/ChatMessage.vue, web/frontend/src/components/layout/AppHeader.vue, web/frontend/src/api/types.ts
+验证：npm run build 零类型错误；dev 5173 HMR 生效
+===== 2026-08-05 =====
+类型：修复
+内容：修复界面被压缩在上半部分、下半页空白的布局 bug——根因是 html/body/#app 未设置 height:100%，子级 h-full 高度链塌陷成内容高度；在 main.css 补全局高度链。同时补齐右上角个人中心缺失的功能（迁移遗漏）：用户菜单完整化（下拉头部显示头像/昵称/账号 + 个人资料 / 我的收藏 / 清空对话记录 / 退出登录四项）；新增 ProfileModal（头像 8 色选择 + 自定义头像上传 ≤1MB + 显示名称 + 个人简介，auth store 新增 updateProfile 持久化到 lawtrust_auth_v2）；新增 favorites store（收藏快照含 meta，按用户名隔离持久化 lawtrust_favorites_v2_xxx + v1 数据迁移）与 FavoritesModal（列表/编辑标题备注/删除）；ChatMessage 底部操作栏加 ☆ 收藏按钮；userScopedStorage 提取到 utils/storage.ts 供 sessions/favorites 共用；登录与路由守卫加载收藏数据
+涉及文件：web/frontend/src/assets/styles/main.css, web/frontend/src/components/layout/AppHeader.vue, web/frontend/src/components/common/ProfileModal.vue, web/frontend/src/components/common/FavoritesModal.vue, web/frontend/src/stores/favorites.ts, web/frontend/src/stores/auth.ts, web/frontend/src/stores/sessions.ts, web/frontend/src/utils/storage.ts, web/frontend/src/components/chat/ChatMessage.vue, web/frontend/src/router/index.ts, web/frontend/src/views/LoginView.vue
+验证：npm run build 零类型错误；dev 5173 与生产 6006 /ui/ 均 200 且服务最新构建
+===== 2026-08-05 =====
+类型：修复
+内容：界面压缩 bug 的真正修复——先前猜测 html/body/#app 缺高度是错的（base.css 本就有 height:100%）；真根因是 Naive UI 三个 provider（n-config-provider/n-message-provider/n-dialog-provider）包裹层高度为 auto，h-full 百分比高度链在中间断链导致布局塌缩成内容高度。ChatView/LoginView 根 div 改用 h-screen（100vh，不依赖父级高度）。同时登录协议弹窗重建为旧版交互：小弹窗「欢迎使用法信通」+ 三个可点开文档的协议链接（《用户协议》《隐私政策》《AI 咨询非正式法律意见》声明，LEGAL_DOCS 真实简短条款）+ 勾选 checkbox 后「同意并继续」按钮才可用 + 独立文档查看弹窗
+涉及文件：web/frontend/src/views/ChatView.vue, web/frontend/src/views/LoginView.vue
+验证：npm run build 零类型错误；dev 5173 / 生产 6006 均服务最新构建（需 Ctrl+F5 硬刷新清除浏览器缓存）
+===== 2026-08-05 =====
+类型：修复
+内容：UI 四项问题修复——（1）右上角美化：移动端详情按钮由 emoji 📊 改为 StatsChartOutline 图标 + 「详情」文字；用户菜单按钮由纯头像改为 头像+用户名+下拉箭头 胶囊按钮；下拉菜单「个人资料/我的收藏」等图标统一 16px 灰调（之前默认尺寸偏大不协调）；（2）可信评估自动展示：法律类回答完成后自动在右侧面板显示（detailPanel 新增 autoShow，追问自动切到最新回答，非法律类回答自动关闭面板）；修复桌面端点击回答时移动端抽屉与侧栏重复弹出的冗余窗口（n-drawer 加 xl:hidden 只在移动端弹出）；（3）用户消息加头像（与个人中心设置一致：头像图/首字 + 头像色），消息容器 max-w-3xl 加宽为 max-w-4xl 减小内容与中间栏边缘的留白；（4）run_server.py 启动前预检 6006 端口占用，重复启动给出通俗提示而非裸报错 [Errno 10048]
+涉及文件：web/frontend/src/stores/detailPanel.ts, web/frontend/src/views/ChatView.vue, web/frontend/src/components/layout/DetailPanel.vue, web/frontend/src/components/layout/AppHeader.vue, web/frontend/src/components/chat/ChatMessage.vue, web/frontend/src/components/detail/DetailBody.vue, scripts/run_server.py
+验证：npm run build 零类型错误；dev 5173 HMR 生效；生产 6006 /ui/ 服务最新 dist（Ctrl+F5 硬刷新）
+===== 2026-08-05 =====
+类型：优化
+内容：详情面板交互优化——（1）删除右上角「详情」按钮（详情已由提问自动展示，按钮多余）；（2）点击 AI 回答不再 toggle 选中（旧行为再点同一消息会清空面板内容，窄屏下抽屉反复弹出灰色遮罩）；selectMessage 改为始终选中并展示，关闭面板统一用面板头部「收起 ✕」按钮（所有尺寸显示，桌面宽屏侧栏可收起）；（3）桌面侧栏改为 v-show 受 isOpen 控制（收起后让出空间），移动端抽屉去掉遮罩（:mask=false，不再盖灰聊天区）
+涉及文件：web/frontend/src/components/layout/AppHeader.vue, web/frontend/src/stores/detailPanel.ts, web/frontend/src/components/layout/DetailPanel.vue, web/frontend/src/components/detail/DetailBody.vue
+验证：npm run build 零类型错误；dev 5173 HMR 生效（Ctrl+F5 硬刷新）
+===== 2026-08-05 =====
+类型：修复
+内容：详情面板默认常驻显示——根因：侧栏原挂在 xl（1280px）断点，窗口窄于 1280 时右侧栏被 CSS 藏起只剩抽屉（默认收起、带遮罩、无收起入口）。修复：侧栏断点放宽到 lg（≥1024px 常驻显示），detailPanel isOpen 初始改为 true（打开页面即显示详情空态）；抽屉仅保留给 <1024px 手机小屏，且仅选中回答后才弹出、无遮罩；「收起」按钮做成带边框背景的按钮样式并移到「详情」文字左侧，点击收起后侧栏隐藏、聊天区 flex 自适应变宽
+涉及文件：web/frontend/src/components/layout/DetailPanel.vue, web/frontend/src/stores/detailPanel.ts, web/frontend/src/components/detail/DetailBody.vue
+验证：npm run build 零类型错误；dev 5173 HMR 生效（Ctrl+F5 硬刷新）
+===== 2026-08-05 =====
+类型：修复
+内容：详情面板问题针对性修复（前两轮改动已确认全部在构建产物中，本轮回应用户缓存 + 三处真实缺口）——（1）彻底移除 n-drawer 抽屉：抽屉容器是全屏 fixed 浮层，是灰色阴影、点击拦截、收起后聊天区不变宽的根源；详情改为普通 flex 侧栏所有视口常驻显示（w-72/xl:w-80，v-show 控制），任何宽度下无浮层无遮罩，收起后面板让出空间聊天区自动变宽；（2）进入页面自动展示最近一条法律类回答的评估（ChatView onMounted 查找最后一条法律类消息 autoShow，无则显示空态）；（3）后端 /ui 的 index.html 加 Cache-Control: no-cache（构建后浏览器不再用缓存旧入口加载已删除的旧 JS）
+涉及文件：web/frontend/src/components/layout/DetailPanel.vue, web/frontend/src/views/ChatView.vue, web/backend/main.py
+验证：npm run build 零类型错误；重启后端后 curl -si localhost:6006/ui/ 返回 200 + cache-control: no-cache，JS hash 与 dist 一致（index-1RR6fhKf.js）；根路径 307 重定向 /ui/index.html；用户需用无痕窗口验证
+===== 2026-08-05 =====
+类型：优化
+内容：收起详情面板后对话内容宽度自适应——根因：消息列表容器写死 max-w-4xl（固定 896px 居中），收起详情后聊天区虽变宽但内容仍锁在 896px（两侧空白变大、内容无变化）。修复：消息列表容器去掉固定最大宽度占满聊天区，气泡宽度改为 min(900px, 88%)（跟随聊天区变宽，900px 封顶保证可读性）；收起/展开详情时对话内容随布局自适应
+涉及文件：web/frontend/src/views/ChatView.vue, web/frontend/src/components/chat/ChatMessage.vue
+验证：npm run build 零类型错误；6006 服务新构建（index-D1a1f-4G.js）；浏览器收起详情面板后消息内容变宽
+===== 2026-08-05 =====
+类型：新增功能 / 优化
+内容：登录界面全面改版——背景图换为 figure/sign1.png（浅色紫调图，去掉原深蓝渐变遮罩），登录卡片改为右侧对齐（sm 以上 pr-12/lg:pr-24 留白）叠加在背景右侧近白斜切留白区；卡片改纯净白底（bg-white/95 + rounded-2xl + shadow-lg）；标题「用户登录」（text-2xl font-bold text-indigo-950）；用户名/密码框由 Naive UI 输入框改为原生 input（左侧 User/钥匙图标、border-slate-200、focus 紫色光圈 ring-purple-500/20、密码框保留眼睛切换）；新增「记住密码」复选框（accent-purple-600，勾选后账号密码存 localStorage 回填，未勾选清除）；登录按钮改紫色满宽长按钮（bg-purple-600 hover:700 active:800）；底部新增「还没有账号？立即注册」链接（点击 toast 提示测试阶段未开放注册）；删除左侧品牌白字文案（浅色背景上不可读）
+涉及文件：web/frontend/src/views/LoginView.vue
+验证：npm run build 零类型错误；6006 服务新构建（index-Dq8IgqlH.js），/figure/sign1.png 200 可访问；浏览器无痕窗口打开 http://localhost:6006 检查视觉效果、记住密码回填、协议弹窗与登录流程
+===== 2026-08-05 =====
+类型：优化
+内容：登录卡片 4 点细节调整——（1）卡片加宽（max-w-420px→440px）、内边距加大（p-8→p-10）、表单纵向间距拉开（space-y-4→space-y-6）、输入框与按钮内边距加高（py-3→py-3.5）；（2）标题重构：品牌标语「法信通 · 可信法律智能问答平台」移至卡片最上方做品牌 Header（text-xl font-bold tracking-wide text-indigo-950），下方紧跟主标题「用户登录」（text-2xl font-bold text-purple-900）；（3）删除底部测试账号提示行；（4）卡片细节：加 backdrop-blur-sm + shadow-xl + border-slate-100 细边框，与背景图斜切浅色块融合
+涉及文件：web/frontend/src/views/LoginView.vue
+验证：npm run build 零类型错误；6006 服务新构建（index-DPkasRtt.js），无痕窗口打开 http://localhost:6006 检查视觉效果
+===== 2026-08-05 =====
+类型：修复 / 优化
+内容：登录界面 3 点调整——（1）品牌标语「法信通 · 可信法律智能问答平台」移出登录卡片（置于卡片外上方做页面级 Header，text-xl font-bold tracking-wide text-indigo-950）；（2）修复图标显示位置：用户名/密码图标与眼睛按钮改用 flex 布局——图标与输入框共用一个带边框的 flex 容器（边框与 focus-within 紫色光圈在父容器上），图标、输入框、眼睛按钮是同一方框内的子元素，物理上不可能渲染到方框外（原 absolute 定位在用户浏览器中出现偏移）；（3）卡片加长：内边距 p-10→p-12、标题下间距 mb-6→mb-10、表单间距 space-y-6→space-y-8、输入框与按钮内高 py-3.5→py-4、注册链接上间距 mt-6→mt-10，卡片高度约 455px→500px，内部输入框同步加高
+涉及文件：web/frontend/src/views/LoginView.vue
+验证：npm run build 零类型错误；6006 服务新构建（index-CJx9GDBh.js）；headless 渲染 DOM 确认品牌标语在卡片外、flex 同框容器生效；无痕窗口打开 http://localhost:6006 检查
+
+===== 2026-08-05 =====
+类型：优化
+内容：登录界面统一蓝色主题——紫色系全部改为蓝色系（blue-600/blue-900 等 Tailwind 默认 blue 色板）：主标题 text-purple-900→text-blue-900，用户名/密码输入框 focus 光圈 focus-within:border-purple-600 + ring-purple-500/20→blue 对应，眼睛按钮 hover:text-purple-600→hover:text-blue-600，记住密码勾选 accent-purple-600→accent-blue-600，登录按钮 bg-purple-600 hover:purple-700 active:purple-800→bg-blue-600 hover:bg-blue-700 active:bg-blue-800，注册链接 text-purple-600→text-blue-600；布局、字号、间距等其他样式一律不动
+涉及文件：web/frontend/src/views/LoginView.vue
+验证：npm run build 零类型错误；6006 服务新构建（index-BdUxPrD7.js）；无痕窗口打开 http://localhost:6006 检查登录页为蓝色系
+
+===== 2026-08-05 =====
+类型：新增功能 / 优化
+内容：问答主界面一体化三栏浅色重构（蓝色主调）——（1）左侧会话栏：深蓝渐变改浅灰底（bg-slate-50 border-r border-slate-200），宽度 240→260px，新建会话改深蓝主按钮（bg-blue-600），选中项 bg-white + shadow-sm + 左侧蓝条（border-l-4 border-blue-600）；（2）中间对话区：背景 bg-slate-100/50，顶部新增固定标题 Header（当前会话标题 + 核验状态卡片：核验中灰卡 / 完成蓝卡「高可信 · N 处法条已核验」），空会话欢迎页改白底卡片；（3）AI 回复重构为单层白底卡片（rounded-xl bg-white p-6 shadow-sm），取消多重外框嵌套：卡片头部 = ⚖️天平头像 + 法信通 + 金/绿渐变评分徽章（TrustBadge 改为 bg-gradient-to-r from-amber-400 to-green-500「★ 综合可信分 85.8 - 高可信」，核验中为灰底徽章）；【结论】淡蓝块（bg-blue-50/60 border-l-4 border-blue-600 rounded-r-lg p-4），【法律分析】行高 1.7，【依据法条】法典小卡片（bg-slate-50 rounded-lg + BookOutline 图标）；（4）底部输入框改居中悬浮式（max-w-3xl rounded-2xl shadow-lg，去掉顶部边框），卡片底部整合两个微型 Toggle（RAG 检索 / 自一致性评估）+ 淡灰小字「回答由 AI 生成，仅供参考」；（5）右侧评估面板加宽至 340px 白底：信任环保留放大（96px、数字 text-3xl），徽章/建议/元信息合并为短评行「高可信 · N 处法条已核验」，加权贡献条改柔和蓝绿渐变进度条（from-blue-500/60 to-green-500/60、贡献分蓝色加粗），六维雷达图网格线淡灰（stroke-slate-200 系）、数据区半透明蓝填充（fill-blue-500/20、stroke-blue-600）、高度 210→240px + 半径 68% 防维度标签重叠；所有浅色容器补 dark: 变体保证深色主题下可读
+涉及文件：web/frontend/src/views/ChatView.vue, web/frontend/src/components/layout/SessionSidebar.vue, web/frontend/src/components/layout/DetailPanel.vue, web/frontend/src/components/chat/ChatMessage.vue, web/frontend/src/components/chat/TrustBadge.vue, web/frontend/src/components/chat/AnswerContent.vue, web/frontend/src/components/chat/ChatInput.vue, web/frontend/src/components/detail/TrustEvalPanel.vue, web/frontend/src/components/detail/RadarChart.vue
+验证：npm run build 零类型错误；curl 确认 6006 服务新构建（index-BdUxPrD7.js == dist，StaticFiles 动态读盘无需重启后端）；无痕窗口登录 root/123456 后检查三栏配色、AI 卡片结构、悬浮输入框、评估面板评分环/贡献条/雷达图，并完成一轮真实问答验证流式输出与核验刷新
+
+===== 2026-08-06 =====
+类型：优化
+内容：聊天界面细节调整——删除顶栏「可信法律问答」徽章；删除聊天区用户/AI 头像；用户气泡内边距调近（px-4 py-3 → px-3 py-2.5）；AI 回答【结论】【法律分析】【依据法条】去方框去底色，统一纯文字标题样式；输入框宽度与消息气泡对齐（max-w-3xl → max-w-[min(900px,88%)]，收起右栏自动变宽）；输入区顶部加半透明渐变遮罩过渡
+涉及文件：AppHeader.vue, ChatMessage.vue, AnswerContent.vue, ChatInput.vue
+验证：npm run build 零错误；curl http://localhost:6006/ui/ 返回 index-DbBrBlaS.js 与 dist 一致；无痕窗口人工核对视觉效果
+
+===== 2026-08-06 =====
+类型：优化
+内容：聊天界面第二轮调整——删除 AI 回答卡片头部「法信通」与「★ 综合可信分」徽章；【结论】【法律分析】【依据法条】标题左侧分别添加对勾/天平/法典小图标；输入框改为满宽贴边（去掉 mx-auto 居中与 900px 上限），左右边缘与消息气泡对齐，收起右侧评估面板时同步自适应变宽；删除上轮误加的顶部渐变遮罩
+涉及文件：ChatMessage.vue, AnswerContent.vue, ChatInput.vue
+验证：npm run build 零错误；curl http://localhost:6006/ui/ 返回 index-CQrq8dQ-.js 与 dist 一致；无痕窗口人工核对视觉与交互

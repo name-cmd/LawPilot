@@ -1,0 +1,95 @@
+/* ============================================================
+ * 法信通设计系统 —— Tailwind CSS v4 入口
+ * v4 采用 "CSS-first" 配置：设计令牌直接写在 @theme 里，
+ * 组件里用 bg-surface / text-ink / border-line 等类名即可。
+ * 暗色模式：.dark 类覆盖令牌变量 → 所有用令牌的组件自动切换。
+ * ============================================================ */
+@import "tailwindcss";
+
+/* 让 dark: 前缀跟随 html.dark 类，而不是系统偏好设置 */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* 布局高度链：html/body/#app 必须撑满视口，
+   否则子级 h-full（100%）会塌陷成内容高度，页面被压缩在上半部分 */
+html,
+body,
+#app {
+  height: 100%;
+}
+
+@theme {
+  /* ---- 品牌色（法务专业蓝） ---- */
+  --color-brand-50: #eef4fc;
+  --color-brand-100: #dbe8f9;
+  --color-brand-200: #b8d1f0;
+  --color-brand-300: #8ab4e3;
+  --color-brand-400: #4d90d9;
+  --color-brand-500: #1a5fb4;
+  --color-brand-600: #164a8f;
+  --color-brand-700: #123a70;
+  --color-brand-800: #0f2d55;
+  --color-brand-900: #0c2240;
+
+  /* ---- 语义色（沿用旧版 CSS 变量语义） ---- */
+  --color-success: #2ec27e;
+  --color-warning: #e5a50a;
+  --color-danger: #e01b24;
+
+  /* ---- 中性面（亮暗双主题变量，见下方 .dark 覆盖） ---- */
+  --color-sidebar: #1a3a5c;     /* 左侧深蓝侧栏 */
+  --color-sidebar-deep: #0f2440;
+  --color-surface: #ffffff;     /* 卡片 / AI 气泡底 */
+  --color-surface-soft: #f5f7fa; /* 次级底（悬停、输入框） */
+  --color-ink: #222222;         /* 正文 */
+  --color-muted: #666666;       /* 弱化文字 */
+  --color-line: #e4e7ed;        /* 边框/分割线 */
+  --color-page: #f0f2f5;        /* 页面背景 */
+
+  /* ---- 字体 ---- */
+  --font-sans: "PingFang SC", "Microsoft YaHei", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+
+  /* ---- 圆角梯度 ---- */
+  --radius-btn: 8px;
+  --radius-card: 12px;
+  --radius-panel: 16px;
+
+  /* ---- 阴影梯度 ---- */
+  --shadow-soft: 0 1px 3px rgb(0 0 0 / 0.08), 0 4px 12px rgb(0 0 0 / 0.05);
+  --shadow-pop: 0 8px 24px rgb(0 0 0 / 0.12);
+  --shadow-drawer: -8px 0 32px rgb(0 0 0 / 0.16);
+
+  /* ---- 动效 ---- */
+  --animate-fade-in-up: fade-in-up 0.2s ease;
+  --animate-blink: blink 1s step-end infinite;
+  --animate-breathe: breathe 1.2s ease-in-out infinite;
+
+  @keyframes fade-in-up {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+  @keyframes breathe {
+    0%, 100% { opacity: 0.35; transform: scale(0.9); }
+    50% { opacity: 1; transform: scale(1); }
+  }
+}
+
+/* ---- 暗色模式：覆盖令牌变量，所有用令牌的组件自动切换 ---- */
+.dark {
+  --color-brand-500: #4d90d9;
+  --color-brand-600: #5ea0e6;
+  --color-sidebar: #0a1526;
+  --color-sidebar-deep: #060d1a;
+  --color-surface: #131c2e;
+  --color-surface-soft: #1a2440;
+  --color-ink: #e6ebf4;
+  --color-muted: #94a3b8;
+  --color-line: #26344d;
+  --color-page: #0b1220;
+  --color-success: #57d9a3;
+  --color-warning: #f6c445;
+  --color-danger: #ff6b81;
+}

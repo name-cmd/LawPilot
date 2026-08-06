@@ -1,0 +1,62 @@
+{
+  "婚姻法": {
+    "status": "repealed",
+    "repeal_date": "2021-01-01",
+    "superseded_by": "民法典",
+    "note": "民法典第一千二百六十条"
+  },
+  "继承法": {
+    "status": "repealed",
+    "repeal_date": "2021-01-01",
+    "superseded_by": "民法典",
+    "note": "民法典第一千二百六十条"
+  },
+  "民法通则": {
+    "status": "repealed",
+    "repeal_date": "2021-01-01",
+    "superseded_by": "民法典",
+    "note": "民法典第一千二百六十条"
+  },
+  "收养法": {
+    "status": "repealed",
+    "repeal_date": "2021-01-01",
+    "superseded_by": "民法典",
+    "note": "民法典第一千二百六十条"
+  },
+  "担保法": {
+    "status": "repealed",
+    "repeal_date": "2021-01-01",
+    "superseded_by": "民法典",
+    "note": "民法典第一千二百六十条"
+  },
+  "合同法": {
+    "status": "repealed",
+    "repeal_date": "2021-01-01",
+    "superseded_by": "民法典",
+    "note": "民法典第一千二百六十条"
+  },
+  "物权法": {
+    "status": "repealed",
+    "repeal_date": "2021-01-01",
+    "superseded_by": "民法典",
+    "note": "民法典第一千二百六十条"
+  },
+  "侵权责任法": {
+    "status": "repealed",
+    "repeal_date": "2021-01-01",
+    "superseded_by": "民法典",
+    "note": "民法典第一千二百六十条"
+  },
+  "民法总则": {
+    "status": "repealed",
+    "repeal_date": "2021-01-01",
+    "superseded_by": "民法典",
+    "note": "民法典第一千二百六十条"
+  },
+  "民事诉讼法（试行）": {
+    "status": "repealed",
+    "repeal_date": "2022-01-01",
+    "superseded_by": "民事诉讼法-checkpoint",
+    "note": "由《民事诉讼法-checkpoint》废止条款自动抽取"
+  }
+}

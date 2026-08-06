@@ -1,0 +1,3713 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>法信通 LawTrust</title>
+  <style>
+    :root {
+      --primary: #1a5fb4;
+      --primary-light: #e8f0fb;
+      --ok: #2ec27e;
+      --warn: #e5a50a;
+      --bad: #e01b24;
+      --bg: #f0f2f5;
+      --card: #fff;
+      --text: #222;
+      --muted: #666;
+      --border: #e4e7ed;
+      --sidebar-w: 240px;
+      --detail-w: 400px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    .app-header {
+      flex-shrink: 0;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .app-header h1 {
+      margin: 0;
+      font-size: 1.25rem;
+      color: #1a3a5c;
+    }
+    .app-header p {
+      margin: 0;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .header-spacer { flex: 1; }
+    .btn-ghost {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      color: var(--muted);
+    }
+    .btn-ghost:hover { border-color: var(--primary); color: var(--primary); }
+
+    .app-body {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+    }
+
+    /* Sidebar: session history */
+    .sidebar {
+      width: var(--sidebar-w);
+      flex-shrink: 0;
+      background: #1a3a5c;
+      color: #e8eef5;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid rgba(0,0,0,.1);
+    }
+    .sidebar-head {
+      padding: 12px;
+      border-bottom: 1px solid rgba(255,255,255,.1);
+    }
+    .btn-new-chat {
+      width: 100%;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-new-chat:hover { background: #164a8f; }
+    .session-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+    .session-item {
+      padding: 10px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: background .15s;
+    }
+    .session-item:hover { background: rgba(255,255,255,.08); }
+    .session-item.active { background: rgba(255,255,255,.15); }
+    .session-title {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .session-del {
+      opacity: 0;
+      background: none;
+      border: none;
+      color: #aaa;
+      cursor: pointer;
+      font-size: 16px;
+      padding: 0 4px;
+      line-height: 1;
+    }
+    .session-rename {
+      opacity: 0;
+      background: none;
+      border: none;
+      color: #aaa;
+      cursor: pointer;
+      font-size: 13px;
+      padding: 0 4px;
+      line-height: 1;
+    }
+    .session-item:hover .session-del,
+    .session-item:hover .session-rename { opacity: 1; }
+    .session-del:hover { color: #ff6b6b; }
+    .session-rename:hover { color: #fff; }
+    .sidebar-empty {
+      padding: 20px 12px;
+      font-size: 12px;
+      color: rgba(255,255,255,.45);
+      text-align: center;
+    }
+
+    /* Main chat column */
+    .main-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      background: var(--bg);
+    }
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .chat-welcome {
+      text-align: center;
+      color: var(--muted);
+      padding: 60px 20px;
+      font-size: 14px;
+    }
+    .chat-welcome h2 {
+      color: #1a3a5c;
+      font-size: 1.1rem;
+      margin: 0 0 8px;
+    }
+    .msg {
+      display: flex;
+      gap: 10px;
+      max-width: 860px;
+    }
+    .msg.user { align-self: flex-end; flex-direction: row-reverse; }
+    .msg.assistant { align-self: flex-start; }
+    .msg-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .msg.user .msg-avatar { background: var(--primary); color: #fff; }
+    .msg.assistant .msg-avatar { background: #e8f0fb; color: var(--primary); }
+    .msg-bubble {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 12px 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+      font-size: 14px;
+      max-width: calc(100% - 42px);
+      cursor: default;
+    }
+    .msg.user .msg-bubble {
+      background: var(--primary);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+    .msg.assistant .msg-bubble {
+      border-bottom-left-radius: 4px;
+      cursor: pointer;
+    }
+    .msg-bubble .answer-box,
+    .msg-bubble .answer-section {
+      user-select: text;
+      -webkit-user-select: text;
+      cursor: text;
+    }
+    .msg.assistant .msg-bubble:hover { box-shadow: 0 2px 8px rgba(26,95,180,.12); }
+    .msg.assistant .msg-bubble.no-detail { cursor: default; }
+    .msg.assistant .msg-bubble.no-detail:hover { box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+    .msg.assistant.selected .msg-bubble {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+    .msg-bubble.loading { color: var(--muted); font-style: italic; }
+    .msg-trust-badge {
+      display: inline-block;
+      margin-top: 8px;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: var(--primary-light);
+      color: var(--primary);
+      font-weight: 600;
+    }
+    .msg.user .msg-trust-badge { background: rgba(255,255,255,.2); color: #fff; }
+    .answer-section { margin-bottom: 10px; }
+    .answer-section:last-child { margin-bottom: 0; }
+    .answer-section h4 {
+      margin: 0 0 4px;
+      font-size: 12px;
+      font-weight: 700;
+      opacity: .85;
+    }
+    .answer-box { white-space: pre-wrap; line-height: 1.7; }
+
+    /* Input area */
+    .input-area {
+      flex-shrink: 0;
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      padding: 14px 20px;
+    }
+    .input-wrap textarea {
+      width: 100%;
+      min-height: 56px;
+      max-height: 160px;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 14px;
+      resize: vertical;
+      font-family: inherit;
+    }
+    .input-wrap textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(26,95,180,.12);
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      margin-top: 10px;
+    }
+    label.chk {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .btn-primary {
+      margin-left: auto;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 9px 24px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      min-width: 100px;
+    }
+    .btn-primary:hover { background: #164a8f; }
+    .btn-primary:disabled { opacity: .6; cursor: not-allowed; }
+    .btn-primary .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      vertical-align: -2px;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .input-hint { font-size: 11px; color: #aaa; margin-top: 6px; }
+
+    /* Document attachments */
+    .attachment-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .attachment-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--primary-light);
+      color: #1a3a5c;
+      border: 1px solid #c5d9f2;
+      border-radius: 8px;
+      padding: 4px 8px 4px 10px;
+      font-size: 12px;
+      max-width: 100%;
+    }
+    .attachment-chip .name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 180px;
+    }
+    .attachment-chip .meta { color: var(--muted); font-size: 11px; }
+    .attachment-chip button {
+      background: none;
+      border: none;
+      color: #888;
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
+      padding: 0 2px;
+    }
+    .attachment-chip button:hover { color: var(--bad); }
+    .attachment-chip.uploading { opacity: .7; }
+  .msg-attachments {
+      margin-top: 6px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .msg-doc-tag {
+      font-size: 11px;
+      background: rgba(26,95,180,.1);
+      color: #1a5fb4;
+      border-radius: 4px;
+      padding: 2px 6px;
+    }
+    .btn-upload {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .btn-upload:hover { border-color: var(--primary); color: var(--primary); }
+    .btn-upload:disabled { opacity: .5; cursor: not-allowed; }
+    #doc-file-input { display: none; }
+
+    /* Detail panel */
+    .detail-panel {
+      width: var(--detail-w);
+      flex-shrink: 0;
+      background: var(--card);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .detail-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .detail-tab {
+      flex: 1;
+      padding: 12px 8px;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      background: none;
+      border: none;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+    }
+    .detail-tab:hover { color: var(--primary); }
+    .detail-tab.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+    .detail-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 16px;
+    }
+    .empty {
+      text-align: center;
+      color: #aaa;
+      padding: 32px 12px;
+      font-size: 13px;
+    }
+
+    .trust-hero {
+      background: linear-gradient(135deg, #f8fbff 0%, #eef4fc 100%);
+      border: 1px solid #d8e6f7;
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+    .trust-hero-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .trust-ring-wrap { flex-shrink: 0; width: 72px; height: 72px; position: relative; }
+    .trust-ring-svg { width: 72px; height: 72px; transform: rotate(-90deg); }
+    .trust-ring-bg { fill: none; stroke: #e0eaf5; stroke-width: 6; }
+    .trust-ring-fg { fill: none; stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset .4s; }
+    .trust-ring-text {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; font-weight: 700; color: #1a5fb4;
+    }
+    .trust-hero-info { flex: 1; min-width: 0; }
+    .trust-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-bottom: 6px;
+    }
+    .trust-badge.high { background: #e8f5e9; color: #2e7d32; }
+    .trust-badge.mid { background: #fff8e1; color: #f57f17; }
+    .trust-badge.low { background: #fde8e8; color: #c62828; }
+    .trust-badge.pending { background: #e8f0fb; color: #1a5fb4; }
+    .trust-advice {
+      font-size: 12px;
+      color: #555;
+      line-height: 1.55;
+      margin: 0;
+    }
+    .trust-meta-line {
+      font-size: 11px;
+      color: #999;
+      margin-top: 8px;
+    }
+    .trust-weak-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .trust-weak-tag {
+      font-size: 11px;
+      background: #fff3cd;
+      color: #856404;
+      border-radius: 6px;
+      padding: 2px 8px;
+    }
+    .trust-contrib {
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      background: #fafbfc;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .trust-contrib-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #888;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+    .contrib-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      margin-bottom: 4px;
+      color: #555;
+    }
+    .contrib-label { width: 52px; flex-shrink: 0; text-align: right; }
+    .contrib-bar-track {
+      flex: 1;
+      height: 5px;
+      background: #eee;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .contrib-bar-fill { height: 100%; background: #1a5fb4; border-radius: 3px; }
+    .contrib-val { width: 36px; text-align: right; font-weight: 600; color: #1a5fb4; }
+    .contrib-total {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 700;
+      color: #1a3a5c;
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px dashed #e4e7ed;
+    }
+    #radar-chart { width: 100%; height: 200px; margin-bottom: 4px; }
+    .trust-dim-list { margin-top: 4px; }
+    .dim-row {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 6px;
+      overflow: hidden;
+      background: #fff;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .dim-row.expanded { border-color: #a8c8f0; box-shadow: 0 2px 8px rgba(26,95,180,.08); }
+    .dim-row.dim-weak { border-left: 3px solid var(--warn); }
+    .dim-row-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .dim-row-head:hover { background: #f8fbff; }
+    .dim-row-name {
+      flex: 1;
+      font-size: 12px;
+      font-weight: 600;
+      min-width: 0;
+    }
+    .dim-row-weight { font-size: 10px; color: #aaa; font-weight: 400; }
+    .dim-row-bar-track {
+      width: 48px;
+      height: 5px;
+      background: #eee;
+      border-radius: 3px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .dim-row-bar-fill { height: 100%; border-radius: 3px; }
+    .dim-row-score {
+      font-size: 13px;
+      font-weight: 700;
+      width: 32px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .dim-row-score.high { color: var(--ok); }
+    .dim-row-score.mid { color: var(--primary); }
+    .dim-row-score.low { color: var(--bad); }
+    .dim-row-score.pending { color: #aaa; }
+    .dim-row-chevron { font-size: 10px; color: #bbb; flex-shrink: 0; }
+    .dim-row-body {
+      padding: 0 10px 10px;
+      border-top: 1px solid #f0f2f5;
+      background: #fafbfc;
+    }
+    .dim-summary {
+      font-size: 11px;
+      color: #555;
+      line-height: 1.5;
+      margin: 8px 0 6px;
+    }
+    .dim-status-tag {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 4px;
+      margin-right: 4px;
+    }
+    .dim-status-tag.complete { background: #e8f5e9; color: #2e7d32; }
+    .dim-status-tag.pending { background: #e8f0fb; color: #1a5fb4; }
+    .dim-status-tag.partial_default { background: #fff8e1; color: #f57f17; }
+    .dim-checks { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
+    .dim-check-chip {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid #e4e7ed;
+      background: #fff;
+    }
+    .dim-check-chip.ok { border-color: #a5d6a7; color: #2e7d32; }
+    .dim-check-chip.warn { border-color: #ffe082; color: #f57f17; }
+    .dim-check-chip.error { border-color: #ef9a9a; color: #c62828; }
+    .dim-formula {
+      font-size: 10px;
+      color: #666;
+      background: #fff;
+      border: 1px solid #e8ecf0;
+      border-radius: 6px;
+      padding: 6px 8px;
+      margin: 6px 0;
+      line-height: 1.6;
+    }
+    .dim-formula-expr { font-weight: 600; color: #444; margin-bottom: 4px; }
+    .dim-detail-btns { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+    .dim-detail-btn {
+      font-size: 11px;
+      padding: 4px 10px;
+      border: 1px solid #c5d9f2;
+      border-radius: 6px;
+      background: #fff;
+      color: var(--primary);
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .dim-detail-btn:hover { background: var(--primary-light); }
+    .dim-evidence-fold {
+      margin-top: 6px;
+    }
+    .dim-evidence-fold summary {
+      font-size: 10px;
+      color: #999;
+      cursor: pointer;
+      list-style: none;
+    }
+    .dim-evidence-fold summary::-webkit-details-marker { display: none; }
+    .dim-evidence { margin: 4px 0 0; padding-left: 14px; color: var(--muted); font-size: 10px; }
+    .dim-evidence li { margin-bottom: 2px; }
+    .bar-fallback { margin-top: 8px; }
+    .bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; }
+    .bar-label { width: 72px; text-align: right; flex-shrink: 0; }
+    .bar-track { flex: 1; height: 8px; background: #eee; border-radius: 4px; overflow: hidden; }
+    .bar-fill { height: 100%; background: var(--primary); border-radius: 4px; }
+
+    .article-card {
+      border-left: 3px solid var(--primary);
+      background: var(--primary-light);
+      border-radius: 0 8px 8px 0;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      font-size: 13px;
+    }
+    .article-title { font-weight: 700; margin-bottom: 4px; }
+    .article-meta { font-size: 11px; color: #888; margin-bottom: 6px; }
+    .article-body { color: #444; white-space: pre-wrap; }
+    .btn-link {
+      background: none; border: none; color: var(--primary);
+      cursor: pointer; font-size: 12px; padding: 0; margin-top: 4px;
+    }
+    .citation-card {
+      background: #f9f9f9;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      font-size: 13px;
+      border: 1px solid var(--border);
+    }
+    .citation-card.severity-error { border-color: var(--bad); background: #fff5f5; }
+    .citation-card.severity-warning { border-color: var(--warn); background: #fffbeb; }
+    .validity-tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-left: 6px;
+    }
+    .validity-tag.repealed { background: #fde8e8; color: var(--bad); }
+    .validity-tag.effective { background: #e8f5e9; color: var(--ok); }
+    .trust-pending {
+      text-align: center;
+      color: var(--muted);
+      padding: 28px 12px;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+    .trust-pending-hint { font-size: 12px; color: #aaa; margin-top: 6px; }
+    .trust-pending-banner {
+      font-size: 13px;
+      color: #856404;
+      background: #fff3cd;
+      padding: 10px 12px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+    .verdict-ok { color: var(--ok); font-weight: 600; }
+    .verdict-warn { color: var(--warn); font-weight: 600; }
+    .verdict-bad { color: var(--bad); font-weight: 600; }
+    .compare-box {
+      margin-top: 8px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      font-size: 12px;
+    }
+    .compare-col {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px;
+    }
+    .compare-col strong { display: block; margin-bottom: 4px; color: #555; font-size: 11px; }
+    .summary-pre {
+      font-size: 12px;
+      background: #f0f4f8;
+      padding: 10px;
+      border-radius: 6px;
+      white-space: pre-wrap;
+      margin-top: 10px;
+      color: #444;
+    }
+    .meta-tag { font-size: 12px; color: var(--muted); margin-top: 8px; }
+
+    .toast {
+      position: fixed; top: 20px; right: 20px;
+      background: var(--bad); color: #fff;
+      padding: 12px 18px; border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,.15);
+      z-index: 999; display: none; max-width: 360px; font-size: 14px;
+    }
+    .toast.info { background: var(--primary); }
+    .toast.warn { background: var(--warn); color: #222; }
+
+    .msg.refusal .msg-bubble {
+      background: #fff5f5;
+      border: 1px solid #f5c2c7;
+      color: #842029;
+      cursor: default;
+    }
+    .msg.refusal .msg-avatar { background: #fde8e8; color: var(--bad); }
+    .refusal-tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--bad);
+      background: #fde8e8;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-bottom: 8px;
+    }
+
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.45);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 22px 24px;
+      max-width: 420px;
+      width: 100%;
+      box-shadow: 0 8px 32px rgba(0,0,0,.18);
+    }
+    .modal-card h3 { margin: 0 0 10px; font-size: 1rem; color: #1a3a5c; }
+    .modal-card p { margin: 0 0 16px; font-size: 14px; color: #444; line-height: 1.6; }
+    .modal-input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      margin-bottom: 16px;
+      font-family: inherit;
+    }
+    .modal-input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(26,95,180,.12);
+    }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .btn-modal-cancel {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 14px;
+      cursor: pointer;
+      color: var(--muted);
+    }
+    .btn-modal-confirm {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* Mobile */
+    .btn-toggle-sidebar, .btn-toggle-detail { display: none; }
+    @media (max-width: 1100px) {
+      .detail-panel { width: 340px; }
+    }
+    @media (max-width: 900px) {
+      .sidebar {
+        position: fixed;
+        left: 0; top: 0; bottom: 0;
+        z-index: 100;
+        transform: translateX(-100%);
+        transition: transform .25s;
+      }
+      .sidebar.open { transform: translateX(0); }
+      .detail-panel {
+        position: fixed;
+        right: 0; top: 0; bottom: 0;
+        z-index: 100;
+        width: min(100%, 380px);
+        transform: translateX(100%);
+        transition: transform .25s;
+      }
+      .detail-panel.open { transform: translateX(0); }
+      .btn-toggle-sidebar, .btn-toggle-detail { display: inline-block; }
+    }
+
+    /* Login page */
+    .login-page {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+        linear-gradient(135deg, rgba(26, 58, 92, 0.35) 0%, rgba(26, 95, 180, 0.2) 50%, rgba(45, 125, 210, 0.15) 100%),
+        url('/figure/sign.png') center center / cover no-repeat;
+      padding: 20px;
+    }
+    .login-card {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 12px 48px rgba(0,0,0,.2);
+    }
+    .login-logo {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .login-logo h1 {
+      margin: 0 0 6px;
+      font-size: 1.5rem;
+      color: #1a3a5c;
+    }
+    .login-logo p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .login-field {
+      margin-bottom: 18px;
+    }
+    .login-field label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #444;
+      margin-bottom: 6px;
+    }
+    .login-field input {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .login-field input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(26,95,180,.12);
+    }
+    .login-error {
+      background: #fff5f5;
+      border: 1px solid #f5c2c7;
+      color: #842029;
+      font-size: 13px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .login-error.show { display: block; }
+    .btn-login {
+      width: 100%;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+    .btn-login:hover { background: #164a8f; }
+    .btn-login:disabled { opacity: .6; cursor: not-allowed; }
+
+    /* User center */
+    .user-center {
+      position: relative;
+    }
+    .user-trigger {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 4px 12px 4px 4px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--text);
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .user-trigger:hover {
+      border-color: var(--primary);
+      box-shadow: 0 2px 8px rgba(26,95,180,.1);
+    }
+    .user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+      overflow: hidden;
+      background: var(--primary);
+    }
+    .user-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .user-name {
+      max-width: 100px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .user-chevron {
+      font-size: 10px;
+      color: var(--muted);
+    }
+    .user-dropdown {
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.12);
+      min-width: 200px;
+      z-index: 200;
+      display: none;
+      overflow: hidden;
+    }
+    .user-dropdown.open { display: block; }
+    .user-dropdown-head {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .user-dropdown-head .user-avatar { width: 40px; height: 40px; font-size: 15px; }
+    .user-dropdown-info { min-width: 0; }
+    .user-dropdown-info .name {
+      font-weight: 600;
+      font-size: 14px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .user-dropdown-info .sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .user-menu-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 10px 16px;
+      background: none;
+      border: none;
+      font-size: 13px;
+      color: var(--text);
+      cursor: pointer;
+      text-align: left;
+    }
+    .user-menu-item:hover { background: var(--primary-light); color: var(--primary); }
+    .user-menu-item.danger:hover { background: #fff5f5; color: var(--bad); }
+    .user-menu-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 4px 0;
+    }
+
+    /* Profile modal */
+    .avatar-picker {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .avatar-option {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      transition: transform .15s, border-color .15s;
+    }
+    .avatar-option:hover { transform: scale(1.08); }
+    .avatar-option.selected { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(26,95,180,.25); }
+    .avatar-upload {
+      display: inline-block;
+      font-size: 13px;
+      color: var(--primary);
+      cursor: pointer;
+      margin-bottom: 16px;
+    }
+    .avatar-upload input { display: none; }
+    .profile-preview {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 18px;
+      padding: 12px;
+      background: #f8f9fa;
+      border-radius: 10px;
+    }
+    .profile-preview .user-avatar { width: 56px; height: 56px; font-size: 20px; }
+    .profile-field { margin-bottom: 14px; }
+    .profile-field label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: #444;
+    }
+    .profile-field input, .profile-field textarea {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+    .profile-field textarea { resize: vertical; min-height: 60px; }
+    .profile-field input:focus, .profile-field textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(26,95,180,.12);
+    }
+
+    /* Thinking indicator */
+    .msg-bubble.thinking {
+      color: var(--muted);
+      font-style: normal;
+      min-width: 160px;
+    }
+    .thinking-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .thinking-spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid #d0dff0;
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin .9s linear infinite;
+      flex-shrink: 0;
+    }
+    .thinking-text { font-size: 14px; color: #555; }
+    .thinking-dots::after {
+      content: '';
+      animation: thinkingDots 1.4s steps(4, end) infinite;
+    }
+    @keyframes thinkingDots {
+      0% { content: ''; }
+      25% { content: '.'; }
+      50% { content: '..'; }
+      75% { content: '...'; }
+    }
+
+    /* Legal disclaimer */
+    .legal-disclaimer-footer {
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px dashed var(--border);
+      font-size: 11px;
+      color: #999;
+      text-align: center;
+    }
+    .link-blue {
+      color: var(--primary);
+      cursor: pointer;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .link-blue:hover { text-decoration: underline; }
+    .legal-agree-text {
+      font-size: 13px;
+      color: #444;
+      line-height: 1.8;
+      margin-bottom: 14px;
+    }
+    .legal-agree-check {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 13px;
+      color: #555;
+      margin-bottom: 16px;
+      cursor: pointer;
+    }
+    .legal-doc-placeholder {
+      font-size: 13px;
+      color: #666;
+      line-height: 1.7;
+      padding: 12px;
+      background: #f8f9fa;
+      border-radius: 8px;
+    }
+
+    /* Message actions */
+    .msg-content-wrap { flex: 1; min-width: 0; max-width: calc(100% - 42px); }
+    .msg.user .msg-content-wrap { display: flex; flex-direction: column; align-items: flex-end; }
+    .msg-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 6px;
+      opacity: 0;
+      transition: opacity .15s;
+    }
+    .msg:hover .msg-actions { opacity: 1; }
+    .msg-action-btn {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 11px;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .msg-action-btn:hover { border-color: var(--primary); color: var(--primary); }
+    .msg-action-btn.active-fav { color: #e5a50a; border-color: #e5a50a; }
+    .msg-action-btn.active-up { color: var(--ok); border-color: var(--ok); }
+    .msg-action-btn.active-down { color: var(--bad); border-color: var(--bad); }
+
+    /* Export mode */
+    .export-bar {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 20px;
+      background: #e8f0fb;
+      border-bottom: 1px solid #c5d9f2;
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+    .export-bar.visible { display: flex; }
+    .export-bar .btn-export {
+      margin-left: auto;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .export-bar .btn-export:disabled { opacity: .5; cursor: not-allowed; }
+    .msg-export-check {
+      flex-shrink: 0;
+      width: 18px;
+      height: 18px;
+      margin-top: 8px;
+      cursor: pointer;
+      accent-color: var(--primary);
+    }
+    .msg.has-export-check { gap: 8px; align-items: flex-start; }
+
+    /* Favorites */
+    .fav-item {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+    .fav-item-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .fav-item-title { font-weight: 600; flex: 1; min-width: 0; }
+    .fav-item-meta { font-size: 11px; color: #999; margin-bottom: 6px; }
+    .fav-item-preview {
+      font-size: 12px;
+      color: #666;
+      line-height: 1.5;
+      max-height: 48px;
+      overflow: hidden;
+    }
+    .fav-item-actions { display: flex; gap: 6px; margin-top: 8px; }
+    .fav-item-actions button {
+      font-size: 11px;
+      padding: 3px 8px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: #fff;
+      cursor: pointer;
+    }
+    .fav-item-actions button:hover { border-color: var(--primary); color: var(--primary); }
+    .fav-item-actions button.danger:hover { border-color: var(--bad); color: var(--bad); }
+    .fav-empty { text-align: center; color: #aaa; padding: 24px; font-size: 13px; }
+    .feedback-type-btns { display: flex; gap: 10px; margin-bottom: 12px; }
+    .feedback-type-btn {
+      flex: 1;
+      padding: 10px;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .feedback-type-btn.selected.up { border-color: var(--ok); background: #e8f5e9; }
+    .feedback-type-btn.selected.down { border-color: var(--bad); background: #fff5f5; }
+  </style>
+</head>
+<body>
+
+<!-- Login page -->
+<div class="login-page" id="login-page">
+  <div class="login-card">
+    <div class="login-logo">
+      <h1>法信通 LawTrust</h1>
+      <p>可信法律智能问答与多维可信评估平台</p>
+    </div>
+    <div class="login-error" id="login-error"></div>
+    <form id="login-form" autocomplete="on">
+      <div class="login-field">
+        <label for="login-username">用户名</label>
+        <input type="text" id="login-username" name="username" placeholder="请输入用户名" autocomplete="username" required />
+      </div>
+      <div class="login-field">
+        <label for="login-password">密码</label>
+        <input type="password" id="login-password" name="password" placeholder="请输入密码" autocomplete="current-password" required />
+      </div>
+      <button type="submit" class="btn-login" id="login-btn">登 录</button>
+    </form>
+  </div>
+</div>
+
+<div class="app" id="app-main" style="display:none">
+  <header class="app-header">
+    <button type="button" class="btn-ghost btn-toggle-sidebar" id="toggle-sidebar">会话</button>
+    <div>
+      <h1>法信通 LawTrust</h1>
+      <p>可信法律智能问答与多维可信评估平台</p>
+    </div>
+    <div class="header-spacer"></div>
+    <button type="button" class="btn-ghost btn-toggle-detail" id="toggle-detail">分析详情</button>
+    <div class="user-center" id="user-center">
+      <button type="button" class="user-trigger" id="user-trigger">
+        <div class="user-avatar" id="header-avatar"></div>
+        <span class="user-name" id="header-username">用户</span>
+        <span class="user-chevron">▼</span>
+      </button>
+      <div class="user-dropdown" id="user-dropdown">
+        <div class="user-dropdown-head">
+          <div class="user-avatar" id="dropdown-avatar"></div>
+          <div class="user-dropdown-info">
+            <div class="name" id="dropdown-username">用户</div>
+            <div class="sub" id="dropdown-account">@root</div>
+          </div>
+        </div>
+        <button type="button" class="user-menu-item" id="menu-profile">个人资料</button>
+        <button type="button" class="user-menu-item" id="menu-favorites">我的收藏</button>
+        <button type="button" class="user-menu-item" id="menu-clear-sessions">清空对话记录</button>
+        <div class="user-menu-divider"></div>
+        <button type="button" class="user-menu-item danger" id="menu-logout">退出登录</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="app-body">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-head">
+      <button type="button" class="btn-new-chat" id="new-chat-btn">+ 新对话</button>
+    </div>
+    <div class="session-list" id="session-list"></div>
+  </aside>
+
+  <main class="main-col">
+    <div class="export-bar" id="export-bar">
+      <label class="chk" style="margin:0"><input type="checkbox" id="export-select-all" /> 全选法律问答</label>
+      <span id="export-count">已选 0 条</span>
+      <button type="button" class="btn-export" id="export-report-btn" disabled>导出可信评估报告</button>
+      <button type="button" class="btn-ghost" id="export-cancel-btn">取消</button>
+    </div>
+    <div class="chat-messages" id="chat-messages">
+      <div class="chat-welcome">
+        <h2>开始法律咨询</h2>
+          <p>输入问题后可持续追问；法律类回复可点击查看可信评估、法条溯源与引用核验</p>
+      </div>
+    </div>
+    <div class="input-area">
+      <div class="attachment-list" id="attachment-list"></div>
+      <div class="input-wrap">
+        <textarea id="query-input" placeholder="请输入法律问题，可上传合同/文书辅助分析…" rows="2"></textarea>
+      </div>
+      <div class="toolbar">
+        <input type="file" id="doc-file-input" multiple accept=".txt,.md,.docx,.pdf,.jpg,.jpeg,.png,.bmp,.tiff,.webp" />
+        <button type="button" class="btn-upload" id="upload-doc-btn" title="上传 txt / Word / PDF / 图片">📎 上传文档</button>
+        <label class="chk"><input type="checkbox" id="use-rag" checked /> RAG 法条检索</label>
+        <label class="chk"><input type="checkbox" id="enable-consistency" /> 自一致性评估（较慢）</label>
+        <button type="button" class="btn-ghost" id="export-mode-btn" title="勾选对话导出可信评估报告">📄 导出报告</button>
+        <button type="button" class="btn-primary" id="submit-btn">发送</button>
+      </div>
+      <div class="input-hint">Enter 发送 · Shift+Enter 换行 · 支持 txt/Word/PDF/图片 OCR · 最多 5 个附件</div>
+    </div>
+  </main>
+
+  <aside class="detail-panel" id="detail-panel">
+    <div class="detail-tabs" id="detail-tabs">
+      <button type="button" class="detail-tab active" data-tab="trust">可信评估</button>
+      <button type="button" class="detail-tab" data-tab="articles">法条溯源</button>
+      <button type="button" class="detail-tab" data-tab="citations">引用核验</button>
+    </div>
+    <div class="detail-body" id="detail-body">
+      <div class="empty">选择一条助手回复查看分析详情</div>
+    </div>
+  </aside>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-overlay" id="rename-modal">
+  <div class="modal-card">
+    <h3>重命名对话</h3>
+    <input type="text" class="modal-input" id="rename-input" maxlength="40" placeholder="输入对话名称" />
+    <div class="modal-actions">
+      <button type="button" class="btn-modal-cancel" id="rename-cancel">取消</button>
+      <button type="button" class="btn-modal-confirm" id="rename-save">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="privacy-modal">
+  <div class="modal-card">
+    <h3>隐私信息提示</h3>
+    <p id="privacy-modal-text"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn-modal-cancel" id="privacy-cancel">取消</button>
+      <button type="button" class="btn-modal-confirm" id="privacy-confirm">确认发送</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="legal-agreement-modal">
+  <div class="modal-card" style="max-width:480px">
+    <h3>欢迎使用法信通</h3>
+    <p class="legal-agree-text">
+      在使用本平台前，请阅读并同意
+      <a class="link-blue" href="#" data-legal-doc="user">《用户协议》</a>、
+      <a class="link-blue" href="#" data-legal-doc="privacy">《隐私政策》</a>
+      及
+      <a class="link-blue" href="#" data-legal-doc="ai">《AI 咨询非正式法律意见》声明</a>。
+    </p>
+    <label class="legal-agree-check">
+      <input type="checkbox" id="legal-agree-checkbox" />
+      <span>我已阅读并同意上述协议与声明</span>
+    </label>
+    <div class="modal-actions">
+      <button type="button" class="btn-modal-confirm" id="legal-agree-confirm" disabled>同意并继续</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="legal-doc-modal">
+  <div class="modal-card" style="max-width:440px">
+    <h3 id="legal-doc-title">文档</h3>
+    <div class="legal-doc-placeholder" id="legal-doc-body">具体内容条款敬请期待。</div>
+    <div class="modal-actions">
+      <button type="button" class="btn-modal-confirm" id="legal-doc-close">知道了</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="feedback-modal">
+  <div class="modal-card" style="max-width:400px">
+    <h3>反馈评价</h3>
+    <div class="feedback-type-btns">
+      <button type="button" class="feedback-type-btn" data-fb="up">👍 有帮助</button>
+      <button type="button" class="feedback-type-btn" data-fb="down">👎 需改进</button>
+    </div>
+    <div class="profile-field">
+      <label for="feedback-reason">原因说明（可选）</label>
+      <textarea id="feedback-reason" maxlength="200" placeholder="请描述您的评价原因…"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn-modal-cancel" id="feedback-cancel">取消</button>
+      <button type="button" class="btn-modal-confirm" id="feedback-save">提交</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="favorites-modal">
+  <div class="modal-card" style="max-width:520px;max-height:80vh;display:flex;flex-direction:column">
+    <h3>我的收藏</h3>
+    <div id="favorites-list" style="flex:1;overflow-y:auto;margin-bottom:12px"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn-modal-confirm" id="favorites-close">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="fav-edit-modal">
+  <div class="modal-card" style="max-width:440px">
+    <h3>编辑收藏</h3>
+    <div class="profile-field">
+      <label for="fav-edit-title">标题</label>
+      <input type="text" id="fav-edit-title" maxlength="40" />
+    </div>
+    <div class="profile-field">
+      <label for="fav-edit-note">备注</label>
+      <textarea id="fav-edit-note" maxlength="200" placeholder="添加个人备注…"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn-modal-cancel" id="fav-edit-cancel">取消</button>
+      <button type="button" class="btn-modal-confirm" id="fav-edit-save">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="profile-modal">
+  <div class="modal-card" style="max-width:460px">
+    <h3>个人资料</h3>
+    <div class="profile-preview">
+      <div class="user-avatar" id="profile-preview-avatar"></div>
+      <div>
+        <div style="font-weight:600;font-size:15px" id="profile-preview-name">用户</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px" id="profile-preview-account">@root</div>
+      </div>
+    </div>
+    <div class="profile-field">
+      <label>头像</label>
+      <div class="avatar-picker" id="avatar-picker"></div>
+      <label class="avatar-upload">
+        <input type="file" id="avatar-upload" accept="image/*" />
+        上传自定义头像
+      </label>
+    </div>
+    <div class="profile-field">
+      <label for="profile-display-name">显示名称</label>
+      <input type="text" id="profile-display-name" maxlength="20" placeholder="设置显示名称" />
+    </div>
+    <div class="profile-field">
+      <label for="profile-bio">个人简介（可选）</label>
+      <textarea id="profile-bio" maxlength="100" placeholder="一句话介绍自己"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn-modal-cancel" id="profile-cancel">取消</button>
+      <button type="button" class="btn-modal-confirm" id="profile-save">保存</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<script>
+(function () {
+  const AUTH_KEY = 'lawtrust_auth_v1';
+  const PROFILE_KEY_PREFIX = 'lawtrust_profile_v1';
+  const STORAGE_KEY_PREFIX = 'lawtrust_sessions_v1';
+  const FAVORITES_KEY_PREFIX = 'lawtrust_favorites_v1';
+  const AVATAR_COLORS = ['#1a5fb4', '#2ec27e', '#e5a50a', '#c061cb', '#e01b24', '#3584e4', '#986a44', '#33d17a'];
+
+  const LEGAL_DOC_TITLES = {
+    user: '用户协议',
+    privacy: '隐私政策',
+    ai: 'AI 咨询非正式法律意见声明',
+  };
+
+  const $ = (id) => document.getElementById(id);
+  let chart = null;
+  let activeTab = 'trust';
+  let sessions = [];
+  let currentSessionId = null;
+  let selectedMsgId = null;
+  let loading = false;
+  let pendingAttachments = [];
+  const MAX_ATTACHMENTS = 5;
+  let pendingAsk = null;
+  let renamingSessionId = null;
+  let currentUser = null;
+  let userProfile = null;
+  let selectedAvatarColor = AVATAR_COLORS[0];
+  let customAvatarData = null;
+  let exportMode = false;
+  let exportSelected = new Set();
+  let feedbackTargetMsgId = null;
+  let feedbackSelectedType = null;
+  let editingFavId = null;
+  let expandedDimKey = null;
+  let trustPanelMeta = null;
+  let lastTrustMsgId = null;
+  let pendingLogin = null;
+  let userFavorites = [];
+
+  function storageKey() {
+    return `${STORAGE_KEY_PREFIX}_${currentUser?.username || 'guest'}`;
+  }
+
+  // ── Auth ─────────────────────────────────────────────────
+  function loadAuth() {
+    try {
+      const raw = localStorage.getItem(AUTH_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  }
+
+  function saveAuth(auth) {
+    localStorage.setItem(AUTH_KEY, JSON.stringify(auth));
+  }
+
+  function clearAuth() {
+    localStorage.removeItem(AUTH_KEY);
+  }
+
+  function saveProfile() {
+    if (!currentUser) return;
+    const profile = {
+      username: currentUser.username,
+      displayName: $('profile-display-name').value.trim() || currentUser.username,
+      bio: $('profile-bio').value.trim(),
+      avatarColor: selectedAvatarColor,
+      avatarData: customAvatarData,
+    };
+    userProfile = profile;
+    localStorage.setItem(`${PROFILE_KEY_PREFIX}_${currentUser.username}`, JSON.stringify(profile));
+    renderUserUI();
+  }
+
+  function getProfile() {
+    if (!currentUser) return null;
+    if (userProfile && userProfile.username === currentUser.username) return userProfile;
+    try {
+      const raw = localStorage.getItem(`${PROFILE_KEY_PREFIX}_${currentUser.username}`);
+      userProfile = raw ? JSON.parse(raw) : {
+        username: currentUser.username,
+        displayName: currentUser.display_name || currentUser.username,
+        bio: '',
+        avatarColor: AVATAR_COLORS[0],
+        avatarData: null,
+      };
+    } catch {
+      userProfile = {
+        username: currentUser.username,
+        displayName: currentUser.display_name || currentUser.username,
+        bio: '',
+        avatarColor: AVATAR_COLORS[0],
+        avatarData: null,
+      };
+    }
+    return userProfile;
+  }
+
+  function renderAvatarEl(el, profile) {
+    if (!el || !profile) return;
+    if (profile.avatarData) {
+      el.style.background = 'transparent';
+      el.innerHTML = `<img src="${profile.avatarData}" alt="头像" />`;
+    } else {
+      const name = profile.displayName || profile.username || '?';
+      const initial = name.charAt(0).toUpperCase();
+      el.style.background = profile.avatarColor || AVATAR_COLORS[0];
+      el.textContent = initial;
+    }
+  }
+
+  function renderUserUI() {
+    const profile = getProfile();
+    if (!profile) return;
+    const displayName = profile.displayName || profile.username;
+    $('header-username').textContent = displayName;
+    $('dropdown-username').textContent = displayName;
+    $('dropdown-account').textContent = '@' + profile.username;
+    renderAvatarEl($('header-avatar'), profile);
+    renderAvatarEl($('dropdown-avatar'), profile);
+  }
+
+  function showLogin() {
+    $('login-page').style.display = 'flex';
+    $('app-main').style.display = 'none';
+    $('login-error').classList.remove('show');
+    $('login-username').focus();
+  }
+
+  function showApp() {
+    $('login-page').style.display = 'none';
+    $('app-main').style.display = 'flex';
+    renderUserUI();
+    loadSessions();
+    loadFavorites();
+  }
+
+  function openLegalAgreementModal() {
+    $('legal-agree-checkbox').checked = false;
+    $('legal-agree-confirm').disabled = true;
+    $('legal-agreement-modal').classList.add('open');
+  }
+
+  function openLegalDoc(docKey) {
+    $('legal-doc-title').textContent = LEGAL_DOC_TITLES[docKey] || '文档';
+    $('legal-doc-body').textContent = '具体内容条款敬请期待。';
+    $('legal-doc-modal').classList.add('open');
+  }
+
+  function favoritesKey() {
+    return `${FAVORITES_KEY_PREFIX}_${currentUser?.username || 'guest'}`;
+  }
+
+  function loadFavorites() {
+    try {
+      const raw = localStorage.getItem(favoritesKey());
+      userFavorites = raw ? JSON.parse(raw) : [];
+    } catch {
+      userFavorites = [];
+    }
+  }
+
+  function saveFavorites() {
+    localStorage.setItem(favoritesKey(), JSON.stringify(userFavorites));
+  }
+
+  function isFavorited(messageId) {
+    return userFavorites.some(f => f.messageId === messageId);
+  }
+
+  function getFavoriteByMessageId(messageId) {
+    return userFavorites.find(f => f.messageId === messageId);
+  }
+
+  function renderThinkingBubble(text) {
+    const label = escapeHtml(text || '正在思考');
+    return `<div class="msg-bubble thinking">
+      <div class="thinking-row">
+        <div class="thinking-spinner"></div>
+        <span class="thinking-text">${label}<span class="thinking-dots"></span></span>
+      </div>
+    </div>`;
+  }
+
+  function renderLegalDisclaimer() {
+    return '<div class="legal-disclaimer-footer">仅供参考，不构成法律意见</div>';
+  }
+
+  function renderMsgActions(m, session) {
+    if (m.loading || m.role === 'user') return '';
+    const isRefusal = m.refusal || (m.meta && m.meta.refused);
+    if (isRefusal) return '';
+    const fav = isFavorited(m.id);
+    const fb = m.feedback || {};
+    const upCls = fb.type === 'up' ? ' active-up' : '';
+    const downCls = fb.type === 'down' ? ' active-down' : '';
+    const favCls = fav ? ' active-fav' : '';
+    const regenBtn = `<button type="button" class="msg-action-btn" data-action="regen" data-id="${m.id}" title="重新回答">↻ 重答</button>`;
+    return `<div class="msg-actions">
+      <button type="button" class="msg-action-btn" data-action="copy" data-id="${m.id}" title="复制">复制</button>
+      ${regenBtn}
+      <button type="button" class="msg-action-btn${favCls}" data-action="favorite" data-id="${m.id}" title="收藏">${fav ? '★ 已收藏' : '☆ 收藏'}</button>
+      <button type="button" class="msg-action-btn${upCls}" data-action="feedback-up" data-id="${m.id}" title="有帮助">👍</button>
+      <button type="button" class="msg-action-btn${downCls}" data-action="feedback-down" data-id="${m.id}" title="需改进">👎</button>
+    </div>`;
+  }
+
+  function sessionHasLegalMessages() {
+    const session = getSession();
+    if (!session) return false;
+    return session.messages.some(m => m.role === 'assistant' && isLegalAnalysisMeta(m.meta) && !m.loading);
+  }
+
+  function updateExportBar() {
+    const bar = $('export-bar');
+    const btn = $('export-mode-btn');
+    if (!bar || !btn) return;
+    const hasLegal = sessionHasLegalMessages();
+    btn.style.display = hasLegal ? '' : 'none';
+    if (!exportMode) {
+      bar.classList.remove('visible');
+      return;
+    }
+    bar.classList.add('visible');
+    const legalMsgs = getExportableMessages();
+    $('export-count').textContent = `已选 ${exportSelected.size} 条`;
+    $('export-report-btn').disabled = exportSelected.size === 0;
+    const allSelected = legalMsgs.length > 0 && legalMsgs.every(m => exportSelected.has(m.id));
+    $('export-select-all').checked = allSelected;
+  }
+
+  function getExportableMessages() {
+    const session = getSession();
+    if (!session) return [];
+    return session.messages.filter(m =>
+      m.role === 'assistant' && !m.loading && isLegalAnalysisMeta(m.meta)
+    );
+  }
+
+  function toggleExportMode() {
+    if (!sessionHasLegalMessages()) {
+      showToast('当前对话暂无可导出的法律问答', 'info');
+      return;
+    }
+    exportMode = !exportMode;
+    exportSelected = new Set();
+    updateExportBar();
+    renderChat();
+  }
+
+  function exitExportMode() {
+    exportMode = false;
+    exportSelected = new Set();
+    updateExportBar();
+    renderChat();
+  }
+
+  function getPairedUserMessage(session, assistantMsg) {
+    const idx = session.messages.findIndex(m => m.id === assistantMsg.id);
+    if (idx <= 0) return null;
+    const prev = session.messages[idx - 1];
+    return prev.role === 'user' ? prev : null;
+  }
+
+  function buildReportBarChart(radarData) {
+    if (!radarData || !radarData.length) return '';
+    return `<div style="margin:12px 0">${radarData.map(d => `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px">
+        <span style="width:72px;text-align:right">${escapeHtml(d.name)}</span>
+        <div style="flex:1;height:8px;background:#eee;border-radius:4px;overflow:hidden">
+          <div style="width:${d.value}%;height:100%;background:#1a5fb4;border-radius:4px"></div>
+        </div>
+        <span>${d.value}</span>
+      </div>`).join('')}</div>`;
+  }
+
+  function buildReportSection(msg, session) {
+    const userMsg = getPairedUserMessage(session, msg);
+    const meta = msg.meta || {};
+    const trust = meta.trust || {};
+    const ts = new Date(msg.timestamp || Date.now()).toLocaleString('zh-CN');
+    const radarData = (trust.radar_data || []).filter(d => d.value != null);
+    const dims = (trust.dimension_details || []).map(d => `
+      <tr><td>${escapeHtml(d.label)}</td><td>${d.score != null ? d.score : '—'}</td>
+      <td style="font-size:11px;color:#666">${escapeHtml(d.evidence_summary || (d.evidence || []).join('；'))}</td></tr>`).join('');
+    const articles = (meta.retrieved_articles || []).map(a => `
+      <div style="border-left:3px solid #1a5fb4;padding:8px 12px;margin-bottom:8px;background:#f0f4f8;font-size:12px">
+        <strong>《${escapeHtml(a.law_name)}》${escapeHtml(a.article_num || '')}</strong>
+        <div style="margin-top:4px;color:#444;white-space:pre-wrap">${escapeHtml((a.content || '').slice(0, 500))}</div>
+      </div>`).join('') || '<p style="color:#999">无</p>';
+    const cv = meta.citation_verification || {};
+    const citations = (cv.extracted_citations || []).map(c => `
+      <div style="border:1px solid #e4e7ed;border-radius:6px;padding:8px;margin-bottom:6px;font-size:12px">
+        <strong>${escapeHtml(c.text || '')}</strong>
+        <div>${escapeHtml(c.verdict || '')}</div>
+        ${c.content_match_score != null ? `<div>吻合度：${(c.content_match_score * 100).toFixed(0)}%</div>` : ''}
+      </div>`).join('') || '<p style="color:#999">无显式引用</p>';
+
+    return `
+      <section class="report-section">
+        <h3 class="report-section-title">问答记录 · ${escapeHtml(ts)}</h3>
+        <p class="report-qa"><strong>用户问：</strong>${escapeHtml(userMsg ? userMsg.content : '（未知）')}</p>
+        <div class="report-answer">${escapeHtml(msg.content)}</div>
+        <h4 class="report-h4">可信评估</h4>
+        <p class="report-score-line"><strong class="report-score">${trust.overall_score != null ? trust.overall_score : '—'}</strong>
+        　${escapeHtml(trust.trust_level || '')} — ${escapeHtml(trust.advice || '')}</p>
+        <h5 class="report-h5">六维评分</h5>
+        ${buildReportBarChart(radarData)}
+        <table class="report-table" border="1" cellpadding="6">
+          <tr class="report-table-head"><th>维度</th><th>得分</th><th>证据说明</th></tr>
+          ${dims || '<tr><td colspan="3">暂无</td></tr>'}
+        </table>
+        <h4 class="report-h4">法条溯源</h4>
+        <div class="report-articles">${articles}</div>
+        <h4 class="report-h4">引用核验</h4>
+        <div class="report-citations">${citations}</div>
+        ${cv.summary ? `<pre class="report-summary">${escapeHtml(cv.summary)}</pre>` : ''}
+        <p class="report-disclaimer">仅供参考，不构成法律意见</p>
+      </section>`;
+  }
+
+  const REPORT_PRINT_CSS = `
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: auto;
+      min-height: 0;
+      background: #fff;
+    }
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: #222;
+      line-height: 1.6;
+      font-size: 13px;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .report-root {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 0 24px 16px;
+    }
+    .report-header {
+      padding: 20px 0 12px;
+      border-bottom: 1px solid #e4e7ed;
+      margin-bottom: 20px;
+    }
+    .report-header h1 {
+      margin: 0 0 6px;
+      font-size: 22px;
+      color: #1a3a5c;
+    }
+    .report-meta {
+      font-size: 13px;
+      color: #666;
+      line-height: 1.7;
+    }
+    .report-section {
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px dashed #e4e7ed;
+    }
+    .report-section:last-child {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+    .report-section-title {
+      color: #1a3a5c;
+      border-bottom: 1px solid #e4e7ed;
+      padding-bottom: 6px;
+      margin: 0 0 10px;
+      font-size: 15px;
+      break-after: avoid;
+      page-break-after: avoid;
+    }
+    .report-qa { font-size: 13px; margin: 0 0 8px; }
+    .report-answer {
+      font-size: 13px;
+      background: #f8f9fa;
+      padding: 12px;
+      border-radius: 8px;
+      margin: 0 0 12px;
+      white-space: pre-wrap;
+      break-inside: auto;
+      page-break-inside: auto;
+    }
+    .report-h4 {
+      color: #1a5fb4;
+      margin: 14px 0 8px;
+      font-size: 14px;
+      break-after: avoid;
+      page-break-after: avoid;
+    }
+    .report-h5 { margin: 10px 0 6px; font-size: 13px; }
+    .report-score-line { font-size: 14px; margin: 0 0 8px; }
+    .report-score { font-size: 22px; color: #1a5fb4; }
+    .report-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin-top: 8px;
+    }
+    .report-table-head { background: #e8f0fb; }
+    .report-table tr { break-inside: avoid; page-break-inside: avoid; }
+    .report-articles > div,
+    .report-citations > div {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+    .report-summary {
+      font-size: 11px;
+      background: #f0f4f8;
+      padding: 8px;
+      border-radius: 6px;
+      white-space: pre-wrap;
+      margin: 8px 0 0;
+    }
+    .report-disclaimer {
+      font-size: 11px;
+      color: #999;
+      margin: 10px 0 0;
+      text-align: center;
+    }
+    @page {
+      size: A4;
+      margin: 14mm 16mm;
+    }
+    @media print {
+      html, body {
+        width: auto;
+        height: auto;
+        overflow: visible;
+      }
+      .report-root {
+        max-width: none;
+        padding: 0;
+      }
+      .report-section {
+        break-inside: auto;
+        page-break-inside: auto;
+      }
+    }
+  `;
+
+  function exportTrustReport() {
+    const session = getSession();
+    if (!session || exportSelected.size === 0) return;
+    const msgs = session.messages.filter(m => exportSelected.has(m.id));
+    const profile = getProfile();
+    const now = new Date().toLocaleString('zh-CN');
+    const sections = msgs.map(m => buildReportSection(m, session)).join('');
+    const html = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>法信通 · 可信评估报告</title>
+  <style>${REPORT_PRINT_CSS}</style>
+</head>
+<body>
+  <div class="report-root">
+    <header class="report-header">
+      <h1>法信通 · 可信评估报告</h1>
+      <div class="report-meta">
+        对话：${escapeHtml(session.title)}<br/>
+        导出人：${escapeHtml(profile?.displayName || currentUser?.username || '')}<br/>
+        导出时间：${escapeHtml(now)}<br/>
+        共 ${msgs.length} 条法律问答
+      </div>
+    </header>
+    ${sections}
+  </div>
+</body>
+</html>`;
+    const w = window.open('', '_blank');
+    if (!w) { showToast('请允许弹出窗口以导出报告'); return; }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    const triggerPrint = () => {
+      w.focus();
+      w.print();
+    };
+    if (w.document.readyState === 'complete') {
+      setTimeout(triggerPrint, 350);
+    } else {
+      w.addEventListener('load', () => setTimeout(triggerPrint, 350));
+    }
+    showToast('报告已生成，请在打印对话框中选择「另存为 PDF」', 'info');
+    exitExportMode();
+  }
+
+  function copyMessage(msgId) {
+    const session = getSession();
+    const msg = session?.messages.find(m => m.id === msgId);
+    if (!msg) return;
+    navigator.clipboard.writeText(msg.content).then(() => {
+      showToast('已复制到剪贴板', 'info');
+    }).catch(() => showToast('复制失败'));
+  }
+
+  function toggleFavorite(msgId) {
+    const session = getSession();
+    const msg = session?.messages.find(m => m.id === msgId);
+    if (!msg) return;
+    const existing = getFavoriteByMessageId(msgId);
+    if (existing) {
+      userFavorites = userFavorites.filter(f => f.messageId !== msgId);
+      saveFavorites();
+      showToast('已取消收藏', 'info');
+      renderChat();
+      return;
+    }
+    const userMsg = getPairedUserMessage(session, msg);
+    userFavorites.unshift({
+      id: 'fav_' + Date.now(),
+      messageId: msgId,
+      sessionId: session.id,
+      title: (userMsg?.content || '法律问答').slice(0, 40),
+      note: '',
+      query: userMsg?.content || '',
+      content: msg.content,
+      meta: JSON.parse(JSON.stringify(msg.meta || {})),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+    saveFavorites();
+    showToast('已收藏', 'info');
+    renderChat();
+  }
+
+  function openFeedbackModal(msgId, presetType) {
+    feedbackTargetMsgId = msgId;
+    feedbackSelectedType = presetType || null;
+    const session = getSession();
+    const msg = session?.messages.find(m => m.id === feedbackTargetMsgId);
+    const fb = msg?.feedback || {};
+    feedbackSelectedType = presetType || fb.type || null;
+    $('feedback-reason').value = fb.reason || '';
+    document.querySelectorAll('.feedback-type-btn').forEach(btn => {
+      btn.classList.toggle('selected', btn.dataset.fb === feedbackSelectedType);
+      btn.classList.toggle('up', btn.dataset.fb === 'up' && feedbackSelectedType === 'up');
+      btn.classList.toggle('down', btn.dataset.fb === 'down' && feedbackSelectedType === 'down');
+    });
+    $('feedback-modal').classList.add('open');
+  }
+
+  function saveFeedback() {
+    if (!feedbackTargetMsgId || !feedbackSelectedType) {
+      showToast('请选择评价类型');
+      return;
+    }
+    const session = getSession();
+    const msg = session?.messages.find(m => m.id === feedbackTargetMsgId);
+    if (!msg) return;
+    msg.feedback = {
+      type: feedbackSelectedType,
+      reason: $('feedback-reason').value.trim(),
+      timestamp: Date.now(),
+    };
+    saveSessions();
+    $('feedback-modal').classList.remove('open');
+    feedbackTargetMsgId = null;
+    renderChat();
+    showToast('感谢您的反馈', 'info');
+  }
+
+  function openFavoritesModal() {
+    closeUserDropdown();
+    renderFavoritesList();
+    $('favorites-modal').classList.add('open');
+  }
+
+  function renderFavoritesList() {
+    loadFavorites();
+    const el = $('favorites-list');
+    if (!userFavorites.length) {
+      el.innerHTML = '<div class="fav-empty">暂无收藏，在对话中点击 ☆ 收藏</div>';
+      return;
+    }
+    el.innerHTML = userFavorites.map(f => `
+      <div class="fav-item" data-fav-id="${f.id}">
+        <div class="fav-item-head">
+          <span class="fav-item-title">${escapeHtml(f.title)}</span>
+          ${f.meta?.trust?.overall_score != null ? `<span style="font-size:12px;color:#1a5fb4;font-weight:600">${f.meta.trust.overall_score}分</span>` : ''}
+        </div>
+        <div class="fav-item-meta">${new Date(f.createdAt).toLocaleString('zh-CN')}${f.note ? ' · ' + escapeHtml(f.note) : ''}</div>
+        <div class="fav-item-preview">${escapeHtml(f.content.slice(0, 120))}${f.content.length > 120 ? '…' : ''}</div>
+        <div class="fav-item-actions">
+          <button type="button" data-fav-edit="${f.id}">编辑</button>
+          <button type="button" class="danger" data-fav-del="${f.id}">删除</button>
+        </div>
+      </div>`).join('');
+    el.querySelectorAll('[data-fav-edit]').forEach(btn => {
+      btn.addEventListener('click', () => openFavEdit(btn.dataset.favEdit));
+    });
+    el.querySelectorAll('[data-fav-del]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        userFavorites = userFavorites.filter(f => f.id !== btn.dataset.favDel);
+        saveFavorites();
+        renderFavoritesList();
+        renderChat();
+        showToast('已删除收藏', 'info');
+      });
+    });
+  }
+
+  function openFavEdit(favId) {
+    const fav = userFavorites.find(f => f.id === favId);
+    if (!fav) return;
+    editingFavId = favId;
+    $('fav-edit-title').value = fav.title;
+    $('fav-edit-note').value = fav.note || '';
+    $('fav-edit-modal').classList.add('open');
+  }
+
+  function saveFavEdit() {
+    const fav = userFavorites.find(f => f.id === editingFavId);
+    if (!fav) { $('fav-edit-modal').classList.remove('open'); return; }
+    fav.title = $('fav-edit-title').value.trim() || fav.title;
+    fav.note = $('fav-edit-note').value.trim();
+    fav.updatedAt = Date.now();
+    saveFavorites();
+    $('fav-edit-modal').classList.remove('open');
+    editingFavId = null;
+    renderFavoritesList();
+    showToast('收藏已更新', 'info');
+  }
+
+  async function regenerateAnswer(assistantMsgId) {
+    if (loading) { showToast('请等待当前回复完成'); return; }
+    const session = getSession();
+    const idx = session.messages.findIndex(m => m.id === assistantMsgId);
+    if (idx < 1) return;
+    const userMsg = session.messages[idx - 1];
+    if (userMsg.role !== 'user') return;
+    session.messages = session.messages.slice(0, idx);
+    const newAssistant = {
+      id: uid(),
+      role: 'assistant',
+      content: '',
+      loading: true,
+      thinkingText: '正在重新生成回答…',
+      timestamp: Date.now(),
+    };
+    session.messages.push(newAssistant);
+    saveSessions();
+    renderChat();
+    const query = userMsg.content === '（基于上传文档的分析请求）'
+      ? '请分析以上上传的文档内容，指出关键条款与法律风险。'
+      : userMsg.content;
+    await runChatPipeline(query, session, userMsg, newAssistant, false, []);
+  }
+
+  async function verifyToken(auth) {
+    if (!auth || !auth.token) return false;
+    try {
+      const res = await fetch('/api/auth/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: auth.token }),
+      });
+      const data = await res.json();
+      if (data.valid) {
+        currentUser = { ...auth, display_name: data.display_name || auth.username };
+        return true;
+      }
+    } catch { /* server may be down, fall back to local auth */ }
+    return Boolean(auth.token && auth.username);
+  }
+
+  async function initAuth() {
+    const auth = loadAuth();
+    if (auth && await verifyToken(auth)) {
+      currentUser = auth;
+      showApp();
+      return;
+    }
+    clearAuth();
+    showLogin();
+  }
+
+  async function performLogin(username, password) {
+    const errEl = $('login-error');
+    const btn = $('login-btn');
+
+    btn.disabled = true;
+    btn.textContent = '登录中…';
+
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = typeof data.detail === 'string' ? data.detail : '用户名或密码错误';
+        throw new Error(msg);
+      }
+      currentUser = {
+        token: data.token,
+        username: data.username,
+        display_name: data.display_name,
+      };
+      saveAuth(currentUser);
+      userProfile = null;
+      $('login-password').value = '';
+      showApp();
+    } catch (err) {
+      errEl.textContent = String(err.message || '登录失败，请重试');
+      errEl.classList.add('show');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '登 录';
+    }
+  }
+
+  async function handleLogin(e) {
+    e.preventDefault();
+    const username = $('login-username').value.trim();
+    const password = $('login-password').value;
+    const errEl = $('login-error');
+
+    errEl.classList.remove('show');
+    if (!username || !password) {
+      errEl.textContent = '请输入用户名和密码';
+      errEl.classList.add('show');
+      return;
+    }
+
+    pendingLogin = { username, password };
+    openLegalAgreementModal();
+  }
+
+  async function handleLogout() {
+    const auth = loadAuth();
+    if (auth && auth.token) {
+      try {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: auth.token }),
+        });
+      } catch { /* ignore */ }
+    }
+    clearAuth();
+    currentUser = null;
+    userProfile = null;
+    sessions = [];
+    currentSessionId = null;
+    closeUserDropdown();
+    showLogin();
+  }
+
+  function toggleUserDropdown() {
+    $('user-dropdown').classList.toggle('open');
+  }
+
+  function closeUserDropdown() {
+    $('user-dropdown').classList.remove('open');
+  }
+
+  function openProfileModal() {
+    closeUserDropdown();
+    const profile = getProfile();
+    selectedAvatarColor = profile.avatarColor || AVATAR_COLORS[0];
+    customAvatarData = profile.avatarData || null;
+    $('profile-display-name').value = profile.displayName || '';
+    $('profile-bio').value = profile.bio || '';
+    renderAvatarPicker();
+    updateProfilePreview();
+    $('profile-modal').classList.add('open');
+  }
+
+  function hideProfileModal() {
+    $('profile-modal').classList.remove('open');
+  }
+
+  function renderAvatarPicker() {
+    const picker = $('avatar-picker');
+    picker.innerHTML = AVATAR_COLORS.map(color => `
+      <div class="avatar-option ${color === selectedAvatarColor && !customAvatarData ? 'selected' : ''}"
+           style="background:${color}" data-color="${color}">
+        ${(getProfile().displayName || '?').charAt(0).toUpperCase()}
+      </div>`).join('');
+    picker.querySelectorAll('.avatar-option').forEach(opt => {
+      opt.addEventListener('click', () => {
+        selectedAvatarColor = opt.dataset.color;
+        customAvatarData = null;
+        renderAvatarPicker();
+        updateProfilePreview();
+      });
+    });
+  }
+
+  function updateProfilePreview() {
+    const name = $('profile-display-name').value.trim() || currentUser?.username || '用户';
+    const previewProfile = {
+      displayName: name,
+      username: currentUser?.username,
+      avatarColor: selectedAvatarColor,
+      avatarData: customAvatarData,
+    };
+    $('profile-preview-name').textContent = name;
+    $('profile-preview-account').textContent = '@' + (currentUser?.username || '');
+    renderAvatarEl($('profile-preview-avatar'), previewProfile);
+  }
+
+  function handleAvatarUpload(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    if (file.size > 512 * 1024) {
+      showToast('头像图片不能超过 512KB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      customAvatarData = reader.result;
+      renderAvatarPicker();
+      updateProfilePreview();
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  }
+
+  function clearAllSessions() {
+    if (!confirm('确定清空所有对话记录？此操作不可恢复。')) return;
+    closeUserDropdown();
+    sessions = [];
+    localStorage.removeItem(storageKey());
+    createSession(true);
+    showToast('对话记录已清空', 'info');
+  }
+
+  // ── Storage ──────────────────────────────────────────────
+  function loadSessions() {
+    try {
+      const raw = localStorage.getItem(storageKey());
+      sessions = raw ? JSON.parse(raw) : [];
+    } catch {
+      sessions = [];
+    }
+    sessions = sessions.map(s => ({
+      titleManual: false,
+      ...s,
+      titleManual: Boolean(s.titleManual),
+    }));
+    if (!sessions.length) {
+      createSession(false);
+    }
+    if (!currentSessionId || !sessions.find(s => s.id === currentSessionId)) {
+      currentSessionId = sessions[0]?.id ?? null;
+    }
+    renderSessionList();
+    renderChat();
+  }
+
+  function saveSessions() {
+    localStorage.setItem(storageKey(), JSON.stringify(sessions));
+  }
+
+  function getSession() {
+    return sessions.find(s => s.id === currentSessionId);
+  }
+
+  function createSession(switchTo = true) {
+    if (exportMode) exitExportMode();
+    const s = {
+      id: 's_' + Date.now(),
+      title: '新对话',
+      titleManual: false,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      messages: [],
+    };
+    sessions.unshift(s);
+    if (switchTo || !currentSessionId) currentSessionId = s.id;
+    saveSessions();
+    renderSessionList();
+    if (switchTo) {
+      selectedMsgId = null;
+      renderChat();
+      renderDetail(null);
+      $('query-input').focus();
+    }
+    return s;
+  }
+
+  function deleteSession(id, e) {
+    e.stopPropagation();
+    sessions = sessions.filter(s => s.id !== id);
+    if (!sessions.length) createSession(true);
+    else if (currentSessionId === id) {
+      currentSessionId = sessions[0].id;
+      selectedMsgId = null;
+      renderChat();
+      renderDetail(null);
+    }
+    saveSessions();
+    renderSessionList();
+  }
+
+  function updateSessionTitle(session, firstUserText) {
+    session.updatedAt = Date.now();
+    if (session.titleManual || !firstUserText) return;
+    fetch('/api/session-title', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: firstUserText }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data || !data.title) return;
+        const s = sessions.find(x => x.id === session.id);
+        if (s && !s.titleManual) {
+          s.title = data.title;
+          saveSessions();
+          renderSessionList();
+        }
+      })
+      .catch(() => {
+        const s = sessions.find(x => x.id === session.id);
+        if (s && !s.titleManual) {
+          s.title = firstUserText.slice(0, 18) + (firstUserText.length > 18 ? '…' : '');
+          saveSessions();
+          renderSessionList();
+        }
+      });
+  }
+
+  function openRenameModal(sessionId) {
+    const s = sessions.find(x => x.id === sessionId);
+    if (!s) return;
+    renamingSessionId = sessionId;
+    $('rename-input').value = s.title;
+    $('rename-modal').classList.add('open');
+    setTimeout(() => {
+      $('rename-input').focus();
+      $('rename-input').select();
+    }, 50);
+  }
+
+  function hideRenameModal() {
+    $('rename-modal').classList.remove('open');
+    renamingSessionId = null;
+  }
+
+  function saveRenameModal() {
+    const title = $('rename-input').value.trim();
+    if (!title) { showToast('名称不能为空'); return; }
+    const s = sessions.find(x => x.id === renamingSessionId);
+    if (!s) { hideRenameModal(); return; }
+    s.title = title.slice(0, 40);
+    s.titleManual = true;
+    s.updatedAt = Date.now();
+    saveSessions();
+    renderSessionList();
+    hideRenameModal();
+  }
+
+  // ── Session list UI ──────────────────────────────────────
+  function renderSessionList() {
+    const el = $('session-list');
+    if (!sessions.length) {
+      el.innerHTML = '<div class="sidebar-empty">暂无历史记录</div>';
+      return;
+    }
+    el.innerHTML = sessions.map(s => `
+      <div class="session-item ${s.id === currentSessionId ? 'active' : ''}" data-id="${s.id}">
+        <span class="session-title" title="${escapeAttr(s.title)}">${escapeHtml(s.title)}</span>
+        <button type="button" class="session-rename" title="重命名" data-rename="${s.id}">✎</button>
+        <button type="button" class="session-del" title="删除" data-del="${s.id}">×</button>
+      </div>`).join('');
+
+    el.querySelectorAll('.session-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        if (e.target.closest('.session-del, .session-rename')) return;
+        currentSessionId = item.dataset.id;
+        selectedMsgId = null;
+        if (exportMode) exitExportMode();
+        renderSessionList();
+        renderChat();
+        renderDetail(null);
+        $('sidebar').classList.remove('open');
+      });
+    });
+    el.querySelectorAll('.session-rename').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openRenameModal(btn.dataset.rename);
+      });
+    });
+    el.querySelectorAll('.session-title').forEach(span => {
+      span.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        const item = span.closest('.session-item');
+        if (item) openRenameModal(item.dataset.id);
+      });
+    });
+    el.querySelectorAll('.session-del').forEach(btn => {
+      btn.addEventListener('click', (e) => deleteSession(btn.dataset.del, e));
+    });
+  }
+
+  // ── Legal vs general reply helpers ───────────────────────
+  function isLegalAnalysisMeta(meta) {
+    if (!meta || meta.refused) return false;
+    const intent = meta.intent && meta.intent.intent;
+    if (intent === 'greeting' || intent === 'general_non_legal') return false;
+    return true;
+  }
+
+  function isVerificationPending(meta) {
+    if (!meta) return false;
+    if (meta.verification_status === 'pending') return true;
+    return !!(meta.trust && meta.trust.verification_status === 'pending');
+  }
+
+  function syncDetailTabs(meta) {
+    const tabs = $('detail-tabs');
+    if (!tabs) return;
+    const hide = meta && !isLegalAnalysisMeta(meta);
+    tabs.style.display = hide ? 'none' : '';
+  }
+
+  function renderGeneralPanel(el, meta) {
+    const intent = (meta && meta.intent) || {};
+    const label = intent.intent === 'greeting' ? '寒暄对话' : '通用对话';
+    const reason = intent.reason ? `（${intent.reason}）` : '';
+    el.innerHTML = `
+      <div class="framework-note" style="margin-bottom:12px">
+        <strong>${escapeHtml(label)}</strong>${escapeHtml(reason)}
+      </div>
+      <p style="font-size:13px;color:#555;line-height:1.7;margin:0">
+        本条回复未启用法律检索、可信评估、法条溯源与引用核验。
+        如需获取可追溯的法律分析，请提出具体法律问题，例如劳动合同解除、工伤赔偿、消费维权等。
+      </p>`;
+    if (chart) { chart.dispose(); chart = null; }
+  }
+
+  // ── Chat UI ──────────────────────────────────────────────
+  function buildHistoryForApi(messages, excludeLastUser) {
+    const msgs = excludeLastUser ? messages.slice(0, -1) : messages;
+    return msgs
+      .filter(m => !m.loading && (m.role === 'user' || m.role === 'assistant'))
+      .map(m => ({ role: m.role, content: m.content }));
+  }
+
+  function renderChat() {
+    const session = getSession();
+    const el = $('chat-messages');
+    if (!session || !session.messages.length) {
+      el.innerHTML = `
+        <div class="chat-welcome">
+          <h2>开始法律咨询</h2>
+          <p>输入问题后可持续追问；法律类回复可点击查看可信评估、法条溯源与引用核验</p>
+        </div>`;
+      updateExportBar();
+      return;
+    }
+
+    el.innerHTML = session.messages.map(m => {
+      const isUser = m.role === 'user';
+      const isRefusal = m.refusal || (m.meta && m.meta.refused);
+      const msgClass = isRefusal ? 'assistant refusal' : m.role;
+      const avatar = isUser ? '我' : (isRefusal ? '!' : 'AI');
+      const exportable = !isUser && !m.loading && isLegalAnalysisMeta(m.meta);
+      const exportCheck = exportMode && exportable
+        ? `<input type="checkbox" class="msg-export-check" data-export-id="${m.id}" ${exportSelected.has(m.id) ? 'checked' : ''} />`
+        : '';
+      let body;
+      if (m.loading || (m.role === 'assistant' && !m.content && !isRefusal && !m.refusal)) {
+        body = renderThinkingBubble(m.thinkingText || '正在思考');
+      } else if (isUser) {
+        const docTags = (m.attachments || []).map(a =>
+          `<span class="msg-doc-tag" title="${escapeHtml(a.filename)}">${escapeHtml(a.filename)} · ${a.char_count || 0}字</span>`
+        ).join('');
+        const docsHtml = docTags ? `<div class="msg-attachments">${docTags}</div>` : '';
+        body = `<div class="msg-bubble">${escapeHtml(maskCriticalPii(m.content))}${docsHtml}</div>`;
+      } else if (isRefusal) {
+        body = `<div class="msg-bubble" data-msg-id="${m.id}">
+          <span class="refusal-tag">安全拦截</span>
+          <div class="answer-box">${escapeHtml(m.content)}</div>
+        </div>`;
+      } else {
+        const legalAnalysis = isLegalAnalysisMeta(m.meta);
+        const parts = parseAnswerSections(m.content);
+        const inner = parts && parts.length
+          ? parts.map(p => `<div class="answer-section"><h4>【${p.title}】</h4><div class="answer-box">${escapeHtml(p.body)}</div></div>`).join('')
+          : `<div class="answer-box">${escapeHtml(m.content)}</div>`;
+        const badge = legalAnalysis && m.meta && !isVerificationPending(m.meta)
+          && m.meta.trust && m.meta.trust.overall_score != null
+          ? `<span class="msg-trust-badge">可信分 ${m.meta.trust.overall_score} · ${escapeHtml(m.meta.trust.trust_level)}${(m.meta.validity_warnings && m.meta.validity_warnings.length) ? ' · 含废止法条' : ''}</span>`
+          : '';
+        const disclaimer = legalAnalysis ? renderLegalDisclaimer() : '';
+        const detailClass = legalAnalysis ? '' : ' no-detail';
+        body = `<div class="msg-bubble${detailClass}" data-msg-id="${m.id}" data-legal="${legalAnalysis ? '1' : '0'}">${inner}${badge}${disclaimer}</div>`;
+      }
+      const actions = renderMsgActions(m, session);
+      const selected = !isUser && m.id === selectedMsgId ? ' selected' : '';
+      const exportCls = exportCheck ? ' has-export-check' : '';
+      return `<div class="msg ${msgClass}${selected}${exportCls}" data-id="${m.id}">
+        ${exportCheck}
+        <div class="msg-avatar">${avatar}</div>
+        <div class="msg-content-wrap">
+          ${body}
+          ${actions}
+        </div>
+      </div>`;
+    }).join('');
+
+    el.querySelectorAll('.msg-export-check').forEach(cb => {
+      cb.addEventListener('change', () => {
+        if (cb.checked) exportSelected.add(cb.dataset.exportId);
+        else exportSelected.delete(cb.dataset.exportId);
+        updateExportBar();
+      });
+    });
+
+    el.querySelectorAll('.msg-action-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const action = btn.dataset.action;
+        const id = btn.dataset.id;
+        if (action === 'copy') copyMessage(id);
+        else if (action === 'regen') regenerateAnswer(id);
+        else if (action === 'favorite') toggleFavorite(id);
+        else if (action === 'feedback-up') openFeedbackModal(id, 'up');
+        else if (action === 'feedback-down') openFeedbackModal(id, 'down');
+      });
+    });
+
+    el.querySelectorAll('.msg.assistant:not(.refusal) .msg-bubble:not(.thinking)').forEach(bubble => {
+      bubble.addEventListener('click', () => {
+        const sel = window.getSelection();
+        if (sel && !sel.isCollapsed && sel.toString().trim()) return;
+
+        const msgId = bubble.dataset.msgId;
+        const msg = session.messages.find(m => m.id === msgId);
+        if (!msg || !msg.meta) return;
+        selectedMsgId = msgId;
+        el.querySelectorAll('.msg').forEach(m => m.classList.remove('selected'));
+        const row = bubble.closest('.msg');
+        if (row) row.classList.add('selected');
+        renderDetail(msg.meta);
+        if (isLegalAnalysisMeta(msg.meta)) {
+          $('detail-panel').classList.add('open');
+        }
+      });
+    });
+
+    el.scrollTop = el.scrollHeight;
+    updateExportBar();
+  }
+
+  // ── Detail panel ─────────────────────────────────────────
+  function trustScoreColorClass(score) {
+    if (score == null) return 'pending';
+    if (score >= 85) return 'high';
+    if (score >= 70) return 'mid';
+    return 'low';
+  }
+
+  function trustBarColor(score) {
+    if (score == null) return '#ccc';
+    if (score >= 85) return '#2ec27e';
+    if (score >= 70) return '#1a5fb4';
+    return '#e5a50a';
+  }
+
+  function trustLevelBadgeClass(level, pending) {
+    if (pending) return 'pending';
+    if (!level) return 'mid';
+    if (level.includes('高')) return 'high';
+    if (level.includes('低')) return 'low';
+    return 'mid';
+  }
+
+  function renderTrustRing(score) {
+    const val = score != null ? Number(score) : null;
+    const pct = val != null ? Math.min(100, Math.max(0, val)) : 0;
+    const r = 30;
+    const circ = 2 * Math.PI * r;
+    const offset = circ - (pct / 100) * circ;
+    const stroke = val != null ? trustBarColor(val) : '#ccc';
+    const text = val != null ? val : '…';
+    return `<div class="trust-ring-wrap">
+      <svg class="trust-ring-svg" viewBox="0 0 72 72">
+        <circle class="trust-ring-bg" cx="36" cy="36" r="${r}" />
+        <circle class="trust-ring-fg" cx="36" cy="36" r="${r}"
+          stroke="${stroke}"
+          stroke-dasharray="${circ}"
+          stroke-dashoffset="${offset}" />
+      </svg>
+      <div class="trust-ring-text">${text}</div>
+    </div>`;
+  }
+
+  function renderStatusTag(status) {
+    const labels = { complete: '已核验', pending: '核验中', partial_default: '部分默认' };
+    const label = labels[status] || status;
+    return `<span class="dim-status-tag ${escapeHtml(status)}">${escapeHtml(label)}</span>`;
+  }
+
+  function renderDimChecks(checks) {
+    if (!checks || !checks.length) return '';
+    return `<div class="dim-checks">${checks.map(c => {
+      const sev = c.severity || 'ok';
+      const text = c.total > 1 && c.type !== 'consistency'
+        ? `${escapeHtml(c.label)} ${c.passed}/${c.total}`
+        : c.type === 'consistency'
+          ? `${escapeHtml(c.label)} ${c.passed}%`
+          : escapeHtml(c.label);
+      return `<span class="dim-check-chip ${sev}">${text}</span>`;
+    }).join('')}</div>`;
+  }
+
+  function renderFormulaBlock(formula) {
+    if (!formula) return '';
+    const inputs = (formula.inputs || []).map(inp =>
+      `${escapeHtml(inp.name)} ${inp.value}×${inp.weight}`
+    ).join(' + ');
+    return `<div class="dim-formula">
+      <div class="dim-formula-expr">${escapeHtml(formula.expression || '')}</div>
+      <div>${inputs}${formula.result != null ? ` = <strong>${formula.result}</strong>` : ''}</div>
+    </div>`;
+  }
+
+  function renderContributionSection(trust) {
+    const rows = trust.score_contributions || [];
+    if (!rows.length) return '';
+    const maxContrib = Math.max(...rows.map(r => r.contribution || 0), 1);
+    const rowsHtml = rows.map(r => `
+      <div class="contrib-row">
+        <span class="contrib-label">${escapeHtml(r.label)}</span>
+        <div class="contrib-bar-track">
+          <div class="contrib-bar-fill" style="width:${((r.contribution || 0) / maxContrib * 100).toFixed(0)}%"></div>
+        </div>
+        <span class="contrib-val">+${r.contribution != null ? r.contribution : '—'}</span>
+      </div>`).join('');
+    return `<div class="trust-contrib">
+      <div class="trust-contrib-title">加权贡献</div>
+      ${rowsHtml}
+      <div class="contrib-total">
+        <span>综合可信分</span>
+        <span>${trust.overall_score != null ? trust.overall_score : '…'}</span>
+      </div>
+    </div>`;
+  }
+
+  function renderTrustHero(trust, pending, meta) {
+    const level = pending ? '核验中' : (trust.trust_level || '');
+    const badgeCls = trustLevelBadgeClass(level, pending);
+    const weakTags = (trust.weak_dimensions || []).map(w =>
+      `<span class="trust-weak-tag">${escapeHtml(w.label)} ${w.score}</span>`
+    ).join('');
+    const citeCount = (meta.citation_verification?.extracted_citations || []).length;
+    const articleCount = (meta.retrieved_articles || []).length;
+    const metaParts = [];
+    if (trust.evaluated_at) metaParts.push(`评估 ${escapeHtml(trust.evaluated_at)}`);
+    if (citeCount) metaParts.push(`${citeCount} 处引用已核验`);
+    if (articleCount) metaParts.push(`${articleCount} 条法条溯源`);
+    return `<div class="trust-hero">
+      <div class="trust-hero-row">
+        ${renderTrustRing(trust.overall_score)}
+        <div class="trust-hero-info">
+          <span class="trust-badge ${badgeCls}">${escapeHtml(level)}</span>
+          <p class="trust-advice">${escapeHtml(pending ? '初步回答已生成，完整评估进行中…' : (trust.advice || ''))}</p>
+          ${weakTags ? `<div class="trust-weak-tags">${weakTags}</div>` : ''}
+        </div>
+      </div>
+      ${metaParts.length ? `<div class="trust-meta-line">${metaParts.join(' · ')}</div>` : ''}
+    </div>`;
+  }
+
+  function renderDimRow(d, expanded) {
+    const scoreCls = trustScoreColorClass(d.score);
+    const barColor = trustBarColor(d.score);
+    const barW = d.score != null ? d.score : 0;
+    const weakCls = d.score != null && d.score < 70 ? ' dim-weak' : '';
+    const detailBtns = [];
+    if (d.detail_ref === 'citations') {
+      detailBtns.push('<button type="button" class="dim-detail-btn" data-jump-tab="citations">查看引用核验 →</button>');
+    }
+    if (d.detail_ref === 'articles' || d.key === 'truthfulness') {
+      detailBtns.push('<button type="button" class="dim-detail-btn" data-jump-tab="articles">查看法条溯源 →</button>');
+    }
+    const body = expanded ? `
+      <div class="dim-row-body">
+        ${renderStatusTag(d.status || (d.pending ? 'pending' : 'complete'))}
+        <div class="dim-summary">${escapeHtml(d.evidence_summary || d.method || '')}</div>
+        ${renderDimChecks(d.checks)}
+        ${renderFormulaBlock(d.formula)}
+        ${detailBtns.length ? `<div class="dim-detail-btns">${detailBtns.join('')}</div>` : ''}
+        ${(d.evidence && d.evidence.length) ? `
+          <details class="dim-evidence-fold">
+            <summary>查看完整审计说明</summary>
+            <ul class="dim-evidence">${d.evidence.map(e => `<li>${escapeHtml(e)}</li>`).join('')}</ul>
+          </details>` : ''}
+      </div>` : '';
+    return `<div class="dim-row${expanded ? ' expanded' : ''}${weakCls}" data-dim-key="${escapeHtml(d.key)}">
+      <div class="dim-row-head" data-dim-toggle="${escapeHtml(d.key)}">
+        <span class="dim-row-name">${escapeHtml(d.label)}<span class="dim-row-weight"> ${(d.weight * 100).toFixed(0)}%</span></span>
+        <div class="dim-row-bar-track"><div class="dim-row-bar-fill" style="width:${barW}%;background:${barColor}"></div></div>
+        <span class="dim-row-score ${scoreCls}">${d.score != null ? d.score : '…'}</span>
+        <span class="dim-row-chevron">${expanded ? '▲' : '▼'}</span>
+      </div>
+      ${body}
+    </div>`;
+  }
+
+  function bindTrustPanelEvents(meta) {
+    document.querySelectorAll('[data-dim-toggle]').forEach(head => {
+      head.addEventListener('click', () => {
+        const key = head.dataset.dimToggle;
+        expandedDimKey = expandedDimKey === key ? null : key;
+        renderTrustPanel($('detail-body'), meta);
+      });
+    });
+    document.querySelectorAll('[data-jump-tab]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setActiveTab(btn.dataset.jumpTab);
+      });
+    });
+  }
+
+  function setActiveTab(tab) {
+    activeTab = tab;
+    document.querySelectorAll('.detail-tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.tab === tab);
+    });
+    const session = getSession();
+    const msg = session && session.messages.find(m => m.id === selectedMsgId);
+    if (msg && msg.meta) renderDetail(msg.meta);
+  }
+
+  function renderDetail(meta) {
+    const el = $('detail-body');
+    syncDetailTabs(meta);
+    if (!meta) {
+      el.innerHTML = '<div class="empty">选择一条助手回复查看分析详情</div>';
+      if (chart) { chart.dispose(); chart = null; }
+      lastTrustMsgId = null;
+      expandedDimKey = null;
+      return;
+    }
+    if (!isLegalAnalysisMeta(meta)) {
+      renderGeneralPanel(el, meta);
+      return;
+    }
+    if (activeTab === 'trust') renderTrustPanel(el, meta);
+    else if (activeTab === 'articles') renderArticlesPanel(el, meta.retrieved_articles);
+    else renderCitationsPanel(el, meta);
+  }
+
+  function renderTrustPanel(el, meta) {
+    trustPanelMeta = meta;
+    const pending = isVerificationPending(meta);
+    const trust = meta.trust;
+    if (!trust) {
+      el.innerHTML = pending
+        ? '<div class="trust-pending"><p>可信度分析核验中…</p><p class="trust-pending-hint">初步回答已生成，完整六维评分与引用核验进行中</p></div>'
+        : '<div class="empty">无可信评估数据</div>';
+      if (chart) { chart.dispose(); chart = null; }
+      return;
+    }
+
+    if (selectedMsgId !== lastTrustMsgId) {
+      lastTrustMsgId = selectedMsgId;
+      expandedDimKey = (trust.weak_dimensions && trust.weak_dimensions[0])
+        ? trust.weak_dimensions[0].key
+        : null;
+    }
+
+    const details = trust.dimension_details || [];
+    const dimsHtml = details.map(d => renderDimRow(d, d.key === expandedDimKey)).join('');
+
+    const pendingBanner = pending
+      ? '<div class="trust-pending-banner">可信度分析核验中…</div>'
+      : '';
+
+    el.innerHTML = `
+      ${pendingBanner}
+      ${renderTrustHero(trust, pending, meta)}
+      ${pending ? '' : renderContributionSection(trust)}
+      <div id="radar-chart"></div>
+      <div id="bar-fallback"></div>
+      <div class="trust-dim-list">${dimsHtml}</div>`;
+
+    bindTrustPanelEvents(meta);
+
+    const radarData = (trust.radar_data || []).filter(d => d.value != null);
+    const detailsByKey = {};
+    details.forEach(d => { detailsByKey[d.key] = d; });
+
+    if (typeof echarts !== 'undefined' && radarData.length) {
+      if (chart) chart.dispose();
+      chart = echarts.init($('radar-chart'));
+      const dimKeys = radarData.map(d => d.key || details.find(x => x.label === d.name)?.key);
+      chart.setOption({
+        radar: {
+          indicator: radarData.map(d => ({ name: d.name, max: 100 })),
+          radius: '62%',
+          triggerEvent: true,
+        },
+        series: [{
+          type: 'radar',
+          data: [{
+            value: radarData.map(d => d.value),
+            areaStyle: { opacity: 0.2, color: '#1a5fb4' },
+            lineStyle: { color: '#1a5fb4' },
+            itemStyle: { color: '#1a5fb4' },
+          }],
+        }],
+      });
+      chart.on('click', (params) => {
+        let key = null;
+        if (params.componentType === 'radar' && params.name) {
+          const hit = details.find(d => d.label === params.name);
+          if (hit) key = hit.key;
+        } else if (params.event && params.event.target) {
+          const idx = params.dimensionIndex;
+          if (idx != null && dimKeys[idx]) key = dimKeys[idx];
+        }
+        if (key) {
+          expandedDimKey = expandedDimKey === key ? null : key;
+          renderTrustPanel(el, meta);
+        }
+      });
+      $('bar-fallback').innerHTML = '';
+    } else {
+      if ($('radar-chart')) $('radar-chart').style.display = 'none';
+      $('bar-fallback').innerHTML = renderBarFallback(radarData);
+    }
+  }
+
+  function renderArticlesPanel(el, articles) {
+    if (!articles || !articles.length) {
+      el.innerHTML = '<div class="empty">无检索结果</div>';
+      return;
+    }
+    el.innerHTML = articles.map((a, i) => {
+      const rel = a.relevance_score != null ? `<span>相关度 ${(a.relevance_score * 100).toFixed(0)}%</span>` : '';
+      const status = a.status || 'effective';
+      const validityTag = status !== 'effective'
+        ? `<span class="validity-tag repealed">已废止${a.superseded_by ? ' · 参见' + escapeHtml(a.superseded_by) : ''}</span>`
+        : (a.effective_date ? `<span class="validity-tag effective">现行有效</span>` : '');
+      const body = a.content || '';
+      const short = body.length > 280;
+      const preview = short ? body.slice(0, 280) + '…' : body;
+      return `<div class="article-card">
+        <div class="article-title">《${escapeHtml(a.law_name)}》${escapeHtml(a.article_num)}${validityTag}</div>
+        <div class="article-meta">${rel}</div>
+        <div class="article-body" id="art-body-${i}">${escapeHtml(preview)}</div>
+        ${short ? `<button type="button" class="btn-link" data-full="${escapeAttr(body)}" data-idx="${i}">展开全文</button>` : ''}
+      </div>`;
+    }).join('');
+    el.querySelectorAll('.btn-link').forEach(btn => {
+      btn.addEventListener('click', () => {
+        $(`art-body-${btn.dataset.idx}`).textContent = btn.dataset.full;
+        btn.remove();
+      });
+    });
+  }
+
+  function renderCitationsPanel(el, meta) {
+    const cv = meta.citation_verification;
+    const regenAttempts = meta.regeneration_attempts;
+    if (isVerificationPending(meta)) {
+      el.innerHTML = '<div class="trust-pending"><p>引用核验中…</p><p class="trust-pending-hint">正在比对模型引用与知识库原文</p></div>';
+      return;
+    }
+    const citations = (cv && cv.extracted_citations) || [];
+    const implicits = (cv && cv.implicit_claims) || [];
+    if (!citations.length && !implicits.length) {
+      el.innerHTML = '<div class="empty">无显式引用或未检测</div>';
+      return;
+    }
+    let html = citations.map(c => {
+      const sev = c.severity || 'ok';
+      const sevClass = sev === 'error' ? 'severity-error' : sev === 'warning' ? 'severity-warning' : '';
+      const validity = c.validity && !c.validity.effective
+        ? `<div class="verdict-bad">${escapeHtml(c.validity.warning_message || '已废止')}</div>` : '';
+      const score = c.content_match_score != null ? `<div>吻合度：${(c.content_match_score * 100).toFixed(0)}%</div>` : '';
+      const inRag = c.in_retrieved_context === true ? '✓ 在本次检索结果内' : c.in_retrieved_context === false ? '✗ 不在本次检索结果内' : '';
+      const compare = (c.quoted_text || c.reference_excerpt || c.actual_content) ? `
+        <div class="compare-box">
+          <div class="compare-col"><strong>模型论述摘录</strong>${escapeHtml(c.quoted_text || c.arguing_sentence || '（未摘录）')}</div>
+          <div class="compare-col"><strong>法条对照原文</strong>${escapeHtml((c.reference_excerpt || c.actual_content || '').slice(0, 400))}</div>
+        </div>` : '';
+      return `<div class="citation-card ${sevClass}">
+        <div><strong>${escapeHtml(c.text)}</strong></div>
+        <div class="${verdictClass(c.verdict)}">${escapeHtml(c.verdict || '')}</div>
+        ${validity}
+        ${score}
+        <div style="font-size:11px;color:#888;margin-top:4px">${inRag}</div>
+        ${compare}
+      </div>`;
+    }).join('');
+    if (implicits.length) {
+      html += '<div style="margin-top:12px;font-weight:600;font-size:13px">隐性法律论断核验</div>';
+      html += implicits.map(im => `
+        <div class="citation-card">
+          <div>${escapeHtml(im.claim || im.text || '')}</div>
+          <div class="${im.supported ? 'verdict-ok' : 'verdict-warn'}">
+            ${im.supported ? '✓ 有法律支撑' : '⚠ 支撑不足'}（${((im.support_score || 0) * 100).toFixed(0)}%）
+          </div>
+        </div>`).join('');
+    }
+    if (cv && cv.summary) html += `<pre class="summary-pre">${escapeHtml(cv.summary)}</pre>`;
+    if (regenAttempts > 0) html += `<div class="meta-tag">已自动修正引用 ${regenAttempts} 次</div>`;
+    el.innerHTML = html;
+  }
+
+  // ── Helpers ──────────────────────────────────────────────
+  function showToast(msg, type) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.className = 'toast' + (type ? ' ' + type : '');
+    t.style.display = 'block';
+    setTimeout(() => { t.style.display = 'none'; t.className = 'toast'; }, 5000);
+  }
+
+  function showPrivacyConfirm(warning, onConfirm) {
+    $('privacy-modal-text').textContent = warning;
+    $('privacy-modal').classList.add('open');
+    pendingAsk = onConfirm;
+  }
+
+  function hidePrivacyConfirm() {
+    $('privacy-modal').classList.remove('open');
+    pendingAsk = null;
+  }
+
+  async function checkInput(query, privacyConfirmed) {
+    const res = await fetch('/api/check-input', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query,
+        privacy_confirmed: privacyConfirmed === true,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const detail = data.detail;
+      let msg = '输入检查失败';
+      if (typeof detail === 'string') msg = detail;
+      else if (Array.isArray(detail) && detail.length) {
+        msg = detail.map(d => d.msg || JSON.stringify(d)).join('；');
+      } else if (detail && typeof detail === 'object' && detail.message) {
+        msg = detail.message;
+      }
+      throw new Error(msg);
+    }
+    return data;
+  }
+
+  function appendRefusalMessage(session, query, refusalMessage) {
+    const userMsg = { id: uid(), role: 'user', content: query, timestamp: Date.now() };
+    const assistantMsg = {
+      id: uid(),
+      role: 'assistant',
+      content: refusalMessage,
+      refusal: true,
+      timestamp: Date.now(),
+      meta: { refused: true },
+    };
+    session.messages.push(userMsg, assistantMsg);
+    updateSessionTitle(session, query);
+    saveSessions();
+    renderSessionList();
+    renderChat();
+  }
+
+  function verdictClass(v) {
+    if (!v) return 'verdict-bad';
+    if (v.includes('✅') || v.includes('准确')) return 'verdict-ok';
+    if (v.includes('⚠')) return 'verdict-warn';
+    return 'verdict-bad';
+  }
+
+  function parseAnswerSections(text) {
+    const sections = [
+      { key: '结论', re: /【结论】\s*([\s\S]*?)(?=【法律分析】|【依据法条】|$)/ },
+      { key: '法律分析', re: /【法律分析】\s*([\s\S]*?)(?=【依据法条】|$)/ },
+      { key: '依据法条', re: /【依据法条】\s*([\s\S]*)/ },
+    ];
+    if (!sections.some(s => s.re.test(text))) return null;
+    return sections.map(s => {
+      const m = text.match(s.re);
+      return m ? { title: s.key, body: m[1].trim() } : null;
+    }).filter(Boolean);
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function maskCriticalPii(text) {
+    const maskId = (s) => (s.length >= 14
+      ? s.slice(0, 6) + '*'.repeat(s.length - 10) + s.slice(-4)
+      : '*'.repeat(s.length));
+    const maskBank = (s) => (s.length >= 8
+      ? s.slice(0, 4) + '*'.repeat(s.length - 8) + s.slice(-4)
+      : '*'.repeat(s.length));
+    let out = String(text).replace(/\d{17}[\dXx]/g, maskId);
+    out = out.replace(/\d{16,19}/g, maskBank);
+    return out;
+  }
+
+  function escapeAttr(s) {
+    return String(s).replace(/"/g, '&quot;');
+  }
+
+  function renderBarFallback(radarData) {
+    return `<div class="bar-fallback">${radarData.map(d => `
+      <div class="bar-row">
+        <span class="bar-label">${escapeHtml(d.name)}</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${d.value}%"></div></div>
+        <span>${d.value}</span>
+      </div>`).join('')}</div>`;
+  }
+
+  function uid() {
+    return 'm_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+  }
+
+  const verificationSockets = {};
+
+  function closeVerificationSocket(messageId) {
+    const ws = verificationSockets[messageId];
+    if (ws) {
+      try { ws.close(); } catch (_) {}
+      delete verificationSockets[messageId];
+    }
+  }
+
+  function connectVerificationWS(messageId, assistantMsg, session) {
+    closeVerificationSocket(messageId);
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${proto}//${location.host}/ws/verification/${messageId}`);
+    verificationSockets[messageId] = ws;
+    ws.onmessage = (ev) => {
+      try {
+        const data = JSON.parse(ev.data);
+        if (data.type === 'verification_complete') {
+          applyVerificationResult(assistantMsg, data, session);
+        } else if (data.type === 'verification_error') {
+          showToast('核验失败：' + (data.error || '未知错误'), 'warn');
+        }
+      } catch (_) {}
+    };
+    ws.onerror = () => {};
+  }
+
+  function applyVerificationResult(assistantMsg, data, session) {
+    if (!assistantMsg.meta) assistantMsg.meta = {};
+    assistantMsg.meta.citation_verification = data.citation_verification;
+    assistantMsg.meta.consistency = data.consistency;
+    assistantMsg.meta.trust = data.trust;
+    assistantMsg.meta.validity_warnings = data.validity_warnings || [];
+    assistantMsg.meta.verification_status = 'complete';
+    assistantMsg.meta.regeneration_attempts = data.regeneration_attempts || 0;
+    saveSessions();
+    renderChat();
+    if (selectedMsgId === assistantMsg.id) {
+      renderDetail(assistantMsg.meta);
+    }
+    closeVerificationSocket(assistantMsg.id);
+  }
+
+  function parseSSEStream(reader, onEvent) {
+    const decoder = new TextDecoder();
+    let buffer = '';
+    return reader.read().then(function process({ done, value }) {
+      if (done) return;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop() || '';
+      for (const part of parts) {
+        const lines = part.split('\n');
+        let event = 'message';
+        let data = '';
+        for (const line of lines) {
+          if (line.startsWith('event:')) event = line.slice(6).trim();
+          else if (line.startsWith('data:')) data = line.slice(5).trim();
+        }
+        if (data) {
+          try { onEvent(event, JSON.parse(data)); } catch (_) {}
+        }
+      }
+      return reader.read().then(process);
+    });
+  }
+
+  function renderAttachments() {
+    const el = $('attachment-list');
+    if (!pendingAttachments.length) {
+      el.innerHTML = '';
+      return;
+    }
+    el.innerHTML = pendingAttachments.map((a, i) => `
+      <div class="attachment-chip${a.uploading ? ' uploading' : ''}">
+        <span class="name" title="${escapeHtml(a.filename)}">${escapeHtml(a.filename)}</span>
+        <span class="meta">${a.uploading ? '解析中…' : (a.char_count + '字')}</span>
+        <button type="button" data-idx="${i}" title="移除">×</button>
+      </div>
+    `).join('');
+    el.querySelectorAll('button[data-idx]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        pendingAttachments.splice(Number(btn.dataset.idx), 1);
+        renderAttachments();
+      });
+    });
+  }
+
+  async function uploadDocument(file) {
+    if (pendingAttachments.length >= MAX_ATTACHMENTS) {
+      showToast(`最多上传 ${MAX_ATTACHMENTS} 个文档`);
+      return;
+    }
+    const placeholder = {
+      filename: file.name,
+      uploading: true,
+      char_count: 0,
+      text: '',
+      format: '',
+    };
+    pendingAttachments.push(placeholder);
+    renderAttachments();
+    const idx = pendingAttachments.length - 1;
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch('/api/documents/extract', { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok) {
+        const msg = typeof data.detail === 'string'
+          ? data.detail
+          : (data.detail && (data.detail.message || data.detail)) || '文档解析失败';
+        throw new Error(msg);
+      }
+      pendingAttachments[idx] = {
+        filename: data.filename,
+        text: data.text,
+        format: data.format,
+        char_count: data.char_count,
+        uploading: false,
+      };
+      if (data.warnings && data.warnings.length) {
+        showToast(data.warnings.join('；'), 'info');
+      }
+      renderAttachments();
+    } catch (e) {
+      pendingAttachments.splice(idx, 1);
+      renderAttachments();
+      showToast(String(e.message || e));
+    }
+  }
+
+  function buildUserDocumentsPayload() {
+    return pendingAttachments
+      .filter(a => !a.uploading && a.text)
+      .map(a => ({
+        filename: a.filename,
+        text: a.text,
+        format: a.format,
+        char_count: a.char_count,
+      }));
+  }
+
+  function handleDocFileSelect(e) {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    files.forEach(f => uploadDocument(f));
+  }
+
+  async function askStream(query, session, assistantMsg, confirmed, userDocuments) {
+    const messageId = assistantMsg.id;
+    const history = buildHistoryForApi(session.messages.slice(0, -2));
+    const res = await fetch('/api/chat/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query,
+        message_id: messageId,
+        history,
+        use_rag: $('use-rag').checked,
+        enable_consistency: $('enable-consistency').checked,
+        enable_nli: true,
+        n_consistency_samples: 2,
+        privacy_confirmed: confirmed,
+        user_documents: userDocuments || [],
+      }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      const detail = data.detail;
+      if (typeof detail === 'object' && detail.code === 'privacy_confirm_required') {
+        session.messages = session.messages.filter(m => m.id !== assistantMsg.id);
+        session.messages.pop();
+        $('query-input').value = query;
+        saveSessions();
+        renderChat();
+        showPrivacyConfirm(detail.message, () => ask(true));
+        return;
+      }
+      throw new Error(typeof detail === 'string' ? detail : (detail && detail.message) || '流式请求失败');
+    }
+
+    assistantMsg.thinkingText = '正在检索法条并生成分析…';
+    renderChat();
+
+    let metaReceived = false;
+    let firstToken = false;
+
+    await parseSSEStream(res.body.getReader(), (event, data) => {
+      if (event === 'meta') {
+        assistantMsg.thinkingText = '正在生成回答…';
+        assistantMsg.meta = {
+          intent: data.intent,
+          rag_used: data.rag_used,
+          retrieved_articles: data.retrieved_articles,
+          citation_verification: data.citation_verification,
+          verification_status: 'pending',
+          regeneration_attempts: 0,
+        };
+        metaReceived = true;
+        if (isLegalAnalysisMeta(assistantMsg.meta)) {
+          selectedMsgId = assistantMsg.id;
+          renderDetail(assistantMsg.meta);
+          $('detail-panel').classList.add('open');
+        }
+        renderChat();
+      } else if (event === 'token') {
+        if (!firstToken) {
+          firstToken = true;
+          assistantMsg.loading = false;
+        }
+        assistantMsg.content += data.content || '';
+        renderChat();
+      } else if (event === 'done') {
+        assistantMsg.loading = false;
+        if (data.answer) assistantMsg.content = data.answer;
+        if (data.non_legal) {
+          assistantMsg.meta = { intent: data.intent || { intent: 'greeting' } };
+        } else if (data.trust) {
+          if (!assistantMsg.meta) assistantMsg.meta = {};
+          assistantMsg.meta.trust = data.trust;
+          assistantMsg.meta.verification_status = 'pending';
+        }
+        if (!data.non_legal && metaReceived) {
+          connectVerificationWS(messageId, assistantMsg, session);
+        }
+        renderChat();
+      } else if (event === 'error') {
+        throw new Error(data.message || '生成失败');
+      }
+    });
+  }
+
+  async function askFallback(query, session, assistantMsg, confirmed, userDocuments) {
+    const history = buildHistoryForApi(session.messages.slice(0, -2));
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query,
+        history,
+        use_rag: $('use-rag').checked,
+        enable_consistency: $('enable-consistency').checked,
+        enable_nli: true,
+        n_consistency_samples: 2,
+        privacy_confirmed: confirmed,
+        user_documents: userDocuments || [],
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      const detail = data.detail;
+      if (typeof detail === 'object' && detail.code === 'privacy_confirm_required') {
+        session.messages = session.messages.filter(m => m.id !== assistantMsg.id);
+        session.messages.pop();
+        $('query-input').value = query;
+        saveSessions();
+        renderChat();
+        showPrivacyConfirm(detail.message, () => ask(true));
+        return;
+      }
+      throw new Error(typeof detail === 'string' ? detail : (detail.message || '请求失败'));
+    }
+    assistantMsg.loading = false;
+    if (data.refused) {
+      assistantMsg.content = data.answer;
+      assistantMsg.refusal = true;
+      assistantMsg.meta = { refused: true };
+    } else {
+      assistantMsg.content = data.answer;
+      assistantMsg.meta = {
+        intent: data.intent,
+        rag_used: data.rag_used,
+        trust: data.trust,
+        retrieved_articles: data.retrieved_articles,
+        citation_verification: data.citation_verification,
+        regeneration_attempts: data.regeneration_attempts || 0,
+        verification_status: 'complete',
+      };
+      if (isLegalAnalysisMeta(assistantMsg.meta)) {
+        selectedMsgId = assistantMsg.id;
+        renderDetail(assistantMsg.meta);
+        $('detail-panel').classList.add('open');
+      } else {
+        selectedMsgId = null;
+        renderDetail(null);
+      }
+    }
+    session.updatedAt = Date.now();
+    saveSessions();
+    renderChat();
+  }
+
+  // ── Send message ─────────────────────────────────────────
+  async function runChatPipeline(query, session, userMsg, assistantMsg, confirmed, userDocuments) {
+    loading = true;
+    const btn = $('submit-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>分析中…';
+
+    try {
+      try {
+        await askStream(query, session, assistantMsg, confirmed, userDocuments);
+      } catch (streamErr) {
+        console.warn('Stream failed, fallback to /api/chat', streamErr);
+        assistantMsg.loading = true;
+        assistantMsg.content = '';
+        assistantMsg.thinkingText = '正在重新连接服务…';
+        renderChat();
+        await askFallback(query, session, assistantMsg, confirmed, userDocuments);
+      }
+      session.updatedAt = Date.now();
+      saveSessions();
+      renderChat();
+    } catch (e) {
+      session.messages = session.messages.filter(m => m.id !== assistantMsg.id);
+      if (userMsg && session.messages.length && session.messages[session.messages.length - 1].id === userMsg.id) {
+        session.messages.pop();
+        $('query-input').value = query;
+      }
+      saveSessions();
+      renderChat();
+      showToast(String(e.message || e));
+    } finally {
+      loading = false;
+      btn.disabled = false;
+      btn.textContent = '发送';
+    }
+  }
+
+  async function ask(privacyConfirmed = false) {
+    if (loading) return;
+    const confirmed = privacyConfirmed === true;
+    const rawQuery = $('query-input').value.trim();
+    const readyDocs = pendingAttachments.filter(a => !a.uploading && a.text);
+    if (pendingAttachments.some(a => a.uploading)) {
+      showToast('文档正在解析，请稍候');
+      return;
+    }
+    if (!rawQuery && !readyDocs.length) {
+      showToast('请输入法律问题或上传文档');
+      return;
+    }
+
+    const queryForCheck = rawQuery || '请分析以上上传的文档内容，指出关键条款与法律风险。';
+
+    const session = getSession();
+    if (!session) {
+      showToast('会话未就绪，请刷新页面或点击「新对话」');
+      return;
+    }
+
+    const userDocuments = buildUserDocumentsPayload();
+    const displayQuery = rawQuery || '（基于上传文档的分析请求）';
+    const userMsg = {
+      id: uid(),
+      role: 'user',
+      content: displayQuery,
+      attachments: userDocuments.map(d => ({ filename: d.filename, char_count: d.char_count })),
+      timestamp: Date.now(),
+    };
+    const assistantMsg = {
+      id: uid(),
+      role: 'assistant',
+      content: '',
+      loading: true,
+      thinkingText: '正在理解您的问题…',
+      timestamp: Date.now(),
+    };
+
+    session.messages.push(userMsg, assistantMsg);
+    updateSessionTitle(session, displayQuery);
+    $('query-input').value = '';
+    pendingAttachments = [];
+    renderAttachments();
+    saveSessions();
+    renderSessionList();
+    renderChat();
+
+    let check;
+    try {
+      check = await checkInput(queryForCheck, confirmed);
+    } catch (e) {
+      session.messages = session.messages.filter(m => m.id !== assistantMsg.id && m.id !== userMsg.id);
+      saveSessions();
+      renderChat();
+      showToast(String(e.message || e));
+      return;
+    }
+
+    if (check.refused) {
+      session.messages = session.messages.filter(m => m.id !== assistantMsg.id && m.id !== userMsg.id);
+      saveSessions();
+      appendRefusalMessage(session, rawQuery, check.refusal_message);
+      return;
+    }
+
+    let query = check.sanitized_query || queryForCheck;
+    if (rawQuery && query !== rawQuery) {
+      userMsg.content = query;
+      updateSessionTitle(session, query);
+      saveSessions();
+      renderChat();
+    }
+    if (check.critical_pii_masked) {
+      showToast('已自动脱敏身份证号/银行卡号等极度私密信息', 'info');
+    }
+
+    if (check.needs_privacy_confirm && !confirmed) {
+      session.messages = session.messages.filter(m => m.id !== assistantMsg.id && m.id !== userMsg.id);
+      saveSessions();
+      renderChat();
+      $('query-input').value = check.critical_pii_masked ? query : rawQuery;
+      showPrivacyConfirm(check.privacy_warning, () => {
+        hidePrivacyConfirm();
+        ask(true);
+      });
+      return;
+    }
+
+    assistantMsg.thinkingText = '正在准备分析…';
+    renderChat();
+    await runChatPipeline(query, session, userMsg, assistantMsg, confirmed || !check.needs_privacy_confirm, userDocuments);
+  }
+
+  // ── Events ───────────────────────────────────────────────
+  $('submit-btn').addEventListener('click', () => ask());
+  $('upload-doc-btn').addEventListener('click', () => $('doc-file-input').click());
+  $('doc-file-input').addEventListener('change', handleDocFileSelect);
+  $('new-chat-btn').addEventListener('click', () => createSession(true));
+  $('toggle-sidebar').addEventListener('click', () => $('sidebar').classList.toggle('open'));
+  $('toggle-detail').addEventListener('click', () => $('detail-panel').classList.toggle('open'));
+  document.querySelectorAll('.detail-tab').forEach(tab => {
+    tab.addEventListener('click', () => setActiveTab(tab.dataset.tab));
+  });
+  $('rename-cancel').addEventListener('click', hideRenameModal);
+  $('rename-save').addEventListener('click', saveRenameModal);
+  $('rename-modal').addEventListener('click', (e) => {
+    if (e.target === $('rename-modal')) hideRenameModal();
+  });
+  $('rename-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); saveRenameModal(); }
+    if (e.key === 'Escape') hideRenameModal();
+  });
+  $('privacy-cancel').addEventListener('click', hidePrivacyConfirm);
+  $('privacy-confirm').addEventListener('click', () => {
+    if (pendingAsk) pendingAsk();
+  });
+  $('privacy-modal').addEventListener('click', (e) => {
+    if (e.target === $('privacy-modal')) hidePrivacyConfirm();
+  });
+  $('query-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      ask();
+    }
+  });
+
+  // Auth & user center events
+  $('login-form').addEventListener('submit', handleLogin);
+  $('user-trigger').addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleUserDropdown();
+  });
+  document.addEventListener('click', (e) => {
+    if (!$('user-center').contains(e.target)) closeUserDropdown();
+  });
+  $('menu-profile').addEventListener('click', openProfileModal);
+  $('menu-clear-sessions').addEventListener('click', clearAllSessions);
+  $('menu-logout').addEventListener('click', handleLogout);
+  $('profile-cancel').addEventListener('click', hideProfileModal);
+  $('profile-save').addEventListener('click', () => {
+    saveProfile();
+    hideProfileModal();
+    showToast('个人资料已保存', 'info');
+  });
+  $('profile-modal').addEventListener('click', (e) => {
+    if (e.target === $('profile-modal')) hideProfileModal();
+  });
+  $('profile-display-name').addEventListener('input', updateProfilePreview);
+  $('avatar-upload').addEventListener('change', handleAvatarUpload);
+
+  // Legal agreement
+  $('legal-agree-checkbox').addEventListener('change', () => {
+    $('legal-agree-confirm').disabled = !$('legal-agree-checkbox').checked;
+  });
+  $('legal-agree-confirm').addEventListener('click', async () => {
+    if (!$('legal-agree-checkbox').checked) return;
+    $('legal-agreement-modal').classList.remove('open');
+    if (pendingLogin) {
+      const { username, password } = pendingLogin;
+      pendingLogin = null;
+      await performLogin(username, password);
+    }
+  });
+  document.querySelectorAll('[data-legal-doc]').forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      openLegalDoc(link.dataset.legalDoc);
+    });
+  });
+  $('legal-doc-close').addEventListener('click', () => {
+    $('legal-doc-modal').classList.remove('open');
+  });
+  $('legal-doc-modal').addEventListener('click', (e) => {
+    if (e.target === $('legal-doc-modal')) $('legal-doc-modal').classList.remove('open');
+  });
+
+  // Export
+  $('export-mode-btn').addEventListener('click', toggleExportMode);
+  $('export-cancel-btn').addEventListener('click', exitExportMode);
+  $('export-report-btn').addEventListener('click', exportTrustReport);
+  $('export-select-all').addEventListener('change', () => {
+    const legalMsgs = getExportableMessages();
+    if ($('export-select-all').checked) {
+      legalMsgs.forEach(m => exportSelected.add(m.id));
+    } else {
+      exportSelected.clear();
+    }
+    updateExportBar();
+    renderChat();
+  });
+
+  // Feedback
+  document.querySelectorAll('.feedback-type-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      feedbackSelectedType = btn.dataset.fb;
+      document.querySelectorAll('.feedback-type-btn').forEach(b => {
+        b.classList.toggle('selected', b.dataset.fb === feedbackSelectedType);
+        b.classList.toggle('up', b.dataset.fb === 'up' && feedbackSelectedType === 'up');
+        b.classList.toggle('down', b.dataset.fb === 'down' && feedbackSelectedType === 'down');
+      });
+    });
+  });
+  $('feedback-cancel').addEventListener('click', () => {
+    $('feedback-modal').classList.remove('open');
+    feedbackTargetMsgId = null;
+  });
+  $('feedback-save').addEventListener('click', saveFeedback);
+  $('feedback-modal').addEventListener('click', (e) => {
+    if (e.target === $('feedback-modal')) $('feedback-modal').classList.remove('open');
+  });
+
+  // Favorites
+  $('menu-favorites').addEventListener('click', openFavoritesModal);
+  $('favorites-close').addEventListener('click', () => $('favorites-modal').classList.remove('open'));
+  $('favorites-modal').addEventListener('click', (e) => {
+    if (e.target === $('favorites-modal')) $('favorites-modal').classList.remove('open');
+  });
+  $('fav-edit-cancel').addEventListener('click', () => $('fav-edit-modal').classList.remove('open'));
+  $('fav-edit-save').addEventListener('click', saveFavEdit);
+  $('fav-edit-modal').addEventListener('click', (e) => {
+    if (e.target === $('fav-edit-modal')) $('fav-edit-modal').classList.remove('open');
+  });
+
+  initAuth();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+/* 基础全局样式：body、滚动条、主题过渡 */
+html, body, #app {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-page);
+  color: var(--color-ink);
+  /* 主题切换时的柔和过渡 */
+  transition: background-color 0.2s ease, color 0.2s ease;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 细滚动条（Webkit 内核浏览器） */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-line);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-muted);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
