@@ -123,3 +123,15 @@
 内容：聊天界面第二轮调整——删除 AI 回答卡片头部「法信通」与「★ 综合可信分」徽章；【结论】【法律分析】【依据法条】标题左侧分别添加对勾/天平/法典小图标；输入框改为满宽贴边（去掉 mx-auto 居中与 900px 上限），左右边缘与消息气泡对齐，收起右侧评估面板时同步自适应变宽；删除上轮误加的顶部渐变遮罩
 涉及文件：ChatMessage.vue, AnswerContent.vue, ChatInput.vue
 验证：npm run build 零错误；curl http://localhost:6006/ui/ 返回 index-CQrq8dQ-.js 与 dist 一致；无痕窗口人工核对视觉与交互
+--------------------------------------------------------------------------------
+===== 2026-08-06 =====
+类型：新增功能
+内容：阶段八主线·模型层升级——多模型注册表（src/llm/model_registry.py：7 个模型 qwen3.7-plus/qwen-turbo/qwen3.7-max/deepseek-v4-flash-0731/deepseek-v4-pro/kimi-k2.6/glm-5.2，共用百炼 DASHSCOPE_API_KEY）+ 统一模型接口（src/llm/base.py）；APIClient 改按请求传 model_id（per-model enable_thinking 降级、错误文案泛化）；QwenModel 按注册表分发、按 base_url 缓存客户端；后端新增 GET /api/models（模型目录+离线引擎就绪检测），chat 请求体支持 model/global_model（Auto 解析：前端设置面板 → .env DEFAULT_API_MODEL），SSE 首事件必发 meta 携带实际模型名；修复 config API_MODEL 硬编码（.env 覆盖无效）；前端新增 ModelSelector 两级选择器（离线调用/API 调用，离线未就绪置灰+原因提示）与 SettingsModal（全局默认模型），消息气泡展示模型名，修复非法律回答覆盖 meta 的 bug；实测全部模型支持 enable_thinking=False（关闭思考后 GLM 等第三方模型不再空回答、token 消耗大降）
+涉及文件：src/config.py, src/llm/model_registry.py, src/llm/base.py, src/llm/api_client.py, src/llm/qwen_model.py, src/pipeline/answer_pipeline.py, src/uncertainty/self_consistency.py, web/backend/schemas.py, web/backend/main.py, web/frontend/src/（api/types.ts, api/misc.ts, stores/models.ts, stores/settings.ts, stores/sessions.ts, components/chat/ModelSelector.vue, components/common/SettingsModal.vue, components/layout/AppHeader.vue, components/chat/ChatInput.vue, components/chat/ChatMessage.vue, views/ChatView.vue）, .env.example
+验证：GET /api/models 返回 7 模型+离线状态；流式指定 deepseek-v4-flash-0731/glm-5.2 等正常回答（done 事件含 model_id/model_name）；model=auto + global_model=qwen-turbo 实际走 qwen-turbo；非法模型/离线调用返回 400 中文提示；同步验证 rag 命中时自一致性采样沿用同一模型（[API 用量] 打印一致）；npm run build 零类型错误；浏览器手动切换模型对比回答正常
+
+===== 2026-08-06 =====
+类型：修复 + 优化
+内容：多模型接入后的三处问题修复与前端调整——1) 修复可信核验一直显示「核验中 · 初步回答已生成」且详情不刷新：后台核验线程（BackgroundTasks 线程池）用 asyncio.run 新建事件循环广播 WebSocket 结果，与主循环绑定的连接不兼容（attached to a different loop）导致结果永远送不到前端；改为服务启动时绑定主循环（lifespan 里 bind_main_loop）+ run_coroutine_threadsafe 调度回主循环广播；前端核验失败防呆：收到 verification_error 时消息 verification_status 置 error（types 类型补 'error'），面板退出「核验中」展示已有初步评估；2) 删除中栏顶部标题栏（会话标题与「引用核验中…」状态卡片，只留对话内容）；3) 输入区布局：模型选择器与发送/停止按钮移至卡片右下角，输入框上方不再显示模型选择行，「回答由 AI 生成，仅供参考」移至输入卡片外底部居中；4) 模型选择面板精简：引擎选择仅保留「离线调用/API 调用」两个选项（删除「本地 Qwen2.5-7B · 数据不出本机」「云端大模型 · 7 款可选」副标题），离线未就绪红字（未就绪:未检测到可用CUDA GPU）改为悬停方框内显示，模型名下方说明文字（Auto 的「跟随全局默认」、各模型价格档位）全部删除改悬停 title 显示定位介绍
+涉及文件：web/backend/verification_worker.py, web/backend/main.py, web/frontend/src/views/ChatView.vue, web/frontend/src/components/chat/ChatInput.vue, web/frontend/src/components/chat/ModelSelector.vue, web/frontend/src/api/types.ts
+验证：npm run build 零类型错误；后端重启后流式问答正常（meta 携带模型名/120 chunk/done 带 message_id），WebSocket 3 秒内收到 verification_complete（可信分 82.6、4 处引用核验），总耗时 14s——修复前该推送永远收不到

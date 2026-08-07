@@ -64,11 +64,19 @@ function onToggleFav() {
         </div>
       </div>
 
-      <!-- 底部操作栏（核验状态 + 收藏；拒答消息不显示） -->
+      <!-- 底部操作栏（模型名 + 核验状态 + 收藏；拒答消息不显示） -->
       <div
         v-if="message.content && !message.loading && !message.refusal"
         class="mt-1.5 flex items-center gap-2 px-1 text-[11px] text-muted"
       >
+        <!-- 实际使用的模型名（后端 Auto 解析后落定；流式中断也不丢失） -->
+        <span
+          v-if="message.meta?.model_name"
+          class="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500 dark:bg-slate-700/60 dark:text-slate-400"
+          :title="message.meta.model_id || message.meta.model_name"
+        >
+          {{ message.meta.model_name }}
+        </span>
         <span v-if="message.meta?.verification_status === 'pending'" class="text-warning">
           引用核验中…
         </span>

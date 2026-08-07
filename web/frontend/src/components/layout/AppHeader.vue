@@ -9,10 +9,12 @@ import {
   PersonOutline,
   StarOutline,
   TrashOutline,
+  SettingsOutline,
   ChevronDownOutline,
 } from '@vicons/ionicons5'
 import ProfileModal from '@/components/common/ProfileModal.vue'
 import FavoritesModal from '@/components/common/FavoritesModal.vue'
+import SettingsModal from '@/components/common/SettingsModal.vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useAuthStore } from '@/stores/auth'
 import { useSessionsStore } from '@/stores/sessions'
@@ -28,6 +30,7 @@ const isDark = computed(() => settings.theme === 'dark')
 // 弹窗开关
 const showProfile = ref(false)
 const showFavorites = ref(false)
+const showSettings = ref(false)
 
 /** 头像颜色：个人资料设置的颜色，未设置用品牌蓝 */
 const avatarColor = computed(() => auth.profile?.avatarColor || 'var(--color-brand-500)')
@@ -60,6 +63,7 @@ function menuIcon(icon: typeof PersonOutline) {
 const userOptions = computed(() => [
   { type: 'render' as const, key: 'head', render: renderHead },
   { type: 'divider' as const, key: 'd1' },
+  { label: '设置', key: 'settings', icon: menuIcon(SettingsOutline) },
   { label: '个人资料', key: 'profile', icon: menuIcon(PersonOutline) },
   { label: '我的收藏', key: 'favorites', icon: menuIcon(StarOutline) },
   { label: '清空对话记录', key: 'clear-sessions', icon: menuIcon(TrashOutline) },
@@ -68,7 +72,9 @@ const userOptions = computed(() => [
 ])
 
 function onUserSelect(key: string) {
-  if (key === 'profile') {
+  if (key === 'settings') {
+    showSettings.value = true
+  } else if (key === 'profile') {
     showProfile.value = true
   } else if (key === 'favorites') {
     showFavorites.value = true
@@ -134,7 +140,8 @@ function onUserSelect(key: string) {
       </n-dropdown>
     </div>
 
-    <!-- 个人资料 / 我的收藏 弹窗 -->
+    <!-- 设置 / 个人资料 / 我的收藏 弹窗 -->
+    <SettingsModal :show="showSettings" @close="showSettings = false" />
     <ProfileModal :show="showProfile" @close="showProfile = false" />
     <FavoritesModal :show="showFavorites" @close="showFavorites = false" />
   </header>

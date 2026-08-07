@@ -21,7 +21,12 @@
       "Bash(mv index.html legacy/index.html)",
       "Bash(npm install *)",
       "Bash(npm run *)",
-      "Bash(/c/Users/75806/.conda/envs/LawTrust/python.exe -u scripts/run_server.py > /tmp/lawtrust_server.log 2>&1 & *)"
+      "Bash(/c/Users/75806/.conda/envs/LawTrust/python.exe -u scripts/run_server.py > /tmp/lawtrust_server.log 2>&1 & *)",
+      "Bash(C:/Users/75806/.conda/envs/LawTrust/python.exe -c ' *)",
+      "Bash(curl -s http://localhost:6006/api/health)",
+      "Bash(C:/Users/75806/.conda/envs/LawTrust/python.exe scripts/run_server.py)",
+      "Bash(curl -s http://localhost:6006/api/models)",
+      "Bash(C:/Users/75806/.conda/envs/LawTrust/python.exe -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('api_models:', len\\(d['api_models']\\)\\); print\\('local_engine:', d['local_engine']\\)\")"
     ],
     "additionalDirectories": [
       "\\tmp"

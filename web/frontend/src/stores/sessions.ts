@@ -193,6 +193,10 @@ export const useSessionsStore = defineStore('sessions', {
         enable_nli: settings.enableNli,
         n_consistency_samples: settings.nConsistencySamples,
         privacy_confirmed: privacyConfirmed,
+        // 模型选择：离线调用传 'local'，API 调用传选择器里的 'auto' 或具体模型 id
+        model: settings.modelProvider === 'local' ? 'local' : settings.apiModel,
+        // 设置面板的全局默认模型（Auto 跟随；后端解析为准）
+        global_model: settings.globalDefaultModel,
         user_documents: this.pendingAttachments
           .filter((a) => !a.uploading && a.text)
           .map((a) => ({

@@ -60,6 +60,11 @@ class ChatRequest(BaseModel):
     enable_nli: bool = True
     n_consistency_samples: int = Field(2, ge=1, le=5)
     privacy_confirmed: bool = False
+    # 模型选择：None/"auto" = 跟随全局默认（global_model 或 .env DEFAULT_API_MODEL）；
+    # 具体 id（如 "qwen3.7-plus"/"deepseek-v4-flash-0731"）；"local" = 离线引擎
+    model: Optional[str] = None
+    # 前端设置面板保存的全局默认模型 id（Auto 解析用，最终以后端为准）
+    global_model: Optional[str] = None
 
 
 class ChatStreamRequest(ChatRequest):
@@ -81,6 +86,9 @@ class ChatResponse(BaseModel):
     intent: Optional[Dict[str, Any]] = None
     query_rewrite: Optional[Dict[str, Any]] = None
     rag_used: bool = False
+    # 实际使用的模型（Auto 解析后落定的结果，供前端展示）
+    model_id: Optional[str] = None
+    model_name: Optional[str] = None
 
 
 class HealthResponse(BaseModel):

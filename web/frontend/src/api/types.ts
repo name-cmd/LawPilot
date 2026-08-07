@@ -68,6 +68,33 @@ export interface ChatRequest {
   enable_nli: boolean
   n_consistency_samples: number
   privacy_confirmed: boolean
+  /** 模型选择：'auto' | 模型 id（如 'qwen3.7-plus'）| 'local'；缺省按 auto 处理 */
+  model?: string
+  /** 设置面板保存的全局默认模型 id（Auto 解析用，以后端为准） */
+  global_model?: string
+}
+
+// ── 模型目录（/api/models）──────────────────────────────
+export interface ApiModelInfo {
+  id: string
+  display_name: string
+  provider: string
+  price_tier: string
+  capabilities: string
+  is_default: boolean
+  is_enabled: boolean
+  thinking_supported: boolean
+}
+
+export interface LocalEngineInfo {
+  available: boolean
+  reason: string
+}
+
+export interface ModelsResponse {
+  api_models: ApiModelInfo[]
+  local_engine: LocalEngineInfo
+  default_model: string
 }
 
 // 引用核验（对齐后端 citation_verifier 输出）
@@ -182,16 +209,23 @@ export interface MessageMeta {
   trust?: TrustResult | null
   validity_warnings?: string[]
   regeneration_attempts?: number
-  verification_status?: 'pending' | 'complete'
+  /** pending=核验中；complete=核验完成；error=核验失败（退出"核验中"，展示已有初步评估） */
+  verification_status?: 'pending' | 'complete' | 'error'
   refused?: boolean
+  /** 实际使用的模型（后端 Auto 解析后落定） */
+  model_id?: string
+  model_name?: string
 }
 
 // ── SSE 事件（/api/chat/stream）─────────────────────────
 export interface MetaEvent {
-  intent: MessageMeta['intent']
-  rag_used: boolean
-  retrieved_articles: RetrievedArticle[]
-  citation_verification: CitationVerification
+  intent?: MessageMeta['intent']
+  rag_used?: boolean
+  retrieved_articles?: RetrievedArticle[]
+  citation_verification?: CitationVerification
+  /** 首事件必发：实际使用的模型 */
+  model_id?: string
+  model_name?: string
 }
 
 export interface DoneEvent {
@@ -200,6 +234,8 @@ export interface DoneEvent {
   trust?: TrustResult | null
   non_legal?: boolean
   intent?: MessageMeta['intent']
+  model_id?: string
+  model_name?: string
 }
 
 export interface ErrorEvent {

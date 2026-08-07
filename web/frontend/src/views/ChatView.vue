@@ -8,15 +8,17 @@ import ChatInput from '@/components/chat/ChatInput.vue'
 import ChatMessage from '@/components/chat/ChatMessage.vue'
 import PrivacyConfirmModal from '@/components/chat/PrivacyConfirmModal.vue'
 import { useSessionsStore } from '@/stores/sessions'
+import { useModelsStore } from '@/stores/models'
 import { useDetailPanelStore } from '@/stores/detailPanel'
 import { useChatStream, isAbortError } from '@/composables/useChatStream'
 import { useVerificationWS } from '@/composables/useVerificationWS'
 import { checkInput } from '@/api/misc'
 import { isApiError } from '@/api/client'
 import { uid } from '@/utils/id'
-import { isLegalAnalysisMeta, isVerificationPending } from '@/utils/answer'
+import { isLegalAnalysisMeta } from '@/utils/answer'
 
 const sessions = useSessionsStore()
+const models = useModelsStore()
 const detail = useDetailPanelStore()
 const toast = useMessage()
 const { ask: askStream, cancel } = useChatStream()
@@ -40,28 +42,6 @@ const privacyMessage = ref('')
 
 const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
 
-// 中栏 Header 右侧状态卡片：当前选中消息（无选中则最近一条回答）的核验状态
-const statusCard = computed(() => {
-  const msgs = sessions.currentSession?.messages ?? []
-  const target = detail.selectedMsgId
-    ? msgs.find((m) => m.id === detail.selectedMsgId)
-    : [...msgs].reverse().find((m) => m.role === 'assistant' && !m.loading)
-  if (!target || target.role === 'user' || !isLegalAnalysisMeta(target.meta)) return null
-  if (isVerificationPending(target.meta)) {
-    return { text: '引用核验中…', cls: 'bg-slate-100 text-slate-500' }
-  }
-  const t = target.meta?.trust
-  if (t?.overall_score != null) {
-    const citeCount = target.meta?.citation_verification?.extracted_citations?.length || 0
-    const parts: string[] = []
-    if (t.trust_level) parts.push(t.trust_level)
-    if (citeCount) parts.push(`${citeCount} 处法条已核验`)
-    if (!parts.length) parts.push(`可信分 ${t.overall_score}`)
-    return { text: parts.join(' · '), cls: 'bg-blue-50 text-blue-700' }
-  }
-  return null
-})
-
 // 进入页面时：若当前会话有历史法律类回答，自动在右侧详情展示最近一条的评估
 // （否则右侧栏显示空态提示，详情栏本身照常显示）
 onMounted(() => {
@@ -70,6 +50,8 @@ onMounted(() => {
     .reverse()
     .find((m) => m.role === 'assistant' && !m.loading && isLegalAnalysisMeta(m.meta))
   if (last) detail.autoShow(last.id)
+  // 拉取模型目录（模型选择器/设置面板的数据源；失败不阻塞聊天）
+  models.fetchModels()
 })
 
 /** 追加安全拒答消息（check-input 拒绝时） */
@@ -167,6 +149,8 @@ async function runChatPipeline(query: string, userMsgId: string, assistantMsgId:
       await askStream(payload, {
         onMeta: (meta) => {
           metaReceived = true
+          // 后端首事件必发 meta（含实际使用的模型），法律类并入 RAG 元信息；
+          // 模型名在首个 chunk 前就到达，流式中断也不会丢失
           sessions.updateMessage(assistantMsgId, {
             thinkingText: '正在生成回答…',
             meta: {
@@ -176,6 +160,8 @@ async function runChatPipeline(query: string, userMsgId: string, assistantMsgId:
               citation_verification: meta.citation_verification,
               verification_status: 'pending',
               regeneration_attempts: 0,
+              model_id: meta.model_id,
+              model_name: meta.model_name,
             },
           })
         },
@@ -191,13 +177,26 @@ async function runChatPipeline(query: string, userMsgId: string, assistantMsgId:
           const patch: Record<string, unknown> = { loading: false, thinkingText: undefined }
           if (done.answer) patch.content = done.answer
           if (done.non_legal) {
-            patch.meta = { intent: done.intent || { intent: 'greeting' } }
+            // 合并而非覆盖：保留首 meta 事件的模型名（模型信息已在 onMeta 写入 meta）
+            const m = sessions.currentSession?.messages.find((x) => x.id === assistantMsgId)
+            patch.meta = {
+              ...(m?.meta || {}),
+              intent: done.intent || { intent: 'greeting' },
+              model_id: done.model_id ?? m?.meta?.model_id,
+              model_name: done.model_name ?? m?.meta?.model_name,
+            }
             // 寒暄等非法律回答：关闭详情面板，避免旧评估误导
             detail.close()
           } else if (done.trust) {
             const m = sessions.currentSession?.messages.find((x) => x.id === assistantMsgId)
             const meta = m?.meta || {}
-            patch.meta = { ...meta, trust: done.trust, verification_status: 'pending' }
+            patch.meta = {
+              ...meta,
+              trust: done.trust,
+              verification_status: 'pending',
+              model_id: done.model_id ?? meta.model_id,
+              model_name: done.model_name ?? meta.model_name,
+            }
             // 法律类回答：自动在右侧面板展示可信评估（追问时自动切到最新回答）
             detail.autoShow(assistantMsgId)
           }
@@ -220,7 +219,17 @@ async function runChatPipeline(query: string, userMsgId: string, assistantMsgId:
                   },
                 })
               },
-              onError: (err) => toast.warning('核验失败：' + err),
+              onError: (err) => {
+                // 核验失败防呆：置为 error 退出"核验中"状态，面板展示已有初步评估
+                // （否则详情永远显示"核验中 · 初步回答已生成"，用户以为卡死）
+                const m = sessions.currentSession?.messages.find((x) => x.id === assistantMsgId)
+                if (m) {
+                  sessions.updateMessage(assistantMsgId, {
+                    meta: { ...(m.meta || {}), verification_status: 'error' },
+                  })
+                }
+                toast.warning('核验失败：' + err)
+              },
             })
           }
         },
@@ -247,6 +256,8 @@ async function runChatPipeline(query: string, userMsgId: string, assistantMsgId:
               citation_verification: data.citation_verification,
               regeneration_attempts: data.regeneration_attempts || 0,
               verification_status: 'complete',
+              model_id: data.model_id as string | undefined,
+              model_name: data.model_name as string | undefined,
             }
             // 降级回答同样自动展示可信评估
             detail.autoShow(assistantMsgId)
@@ -298,22 +309,6 @@ function onPrivacyConfirm() {
     <div class="flex min-h-0 flex-1">
       <SessionSidebar />
       <main class="flex min-w-0 flex-1 flex-col bg-slate-100/50 dark:bg-slate-900/60">
-        <!-- 对话标题 Header：当前会话标题 + 核验状态卡片 -->
-        <div
-          class="flex h-13 shrink-0 items-center justify-between border-b border-slate-200 bg-white/70 px-4 backdrop-blur dark:border-slate-700 dark:bg-slate-800/70"
-        >
-          <h2 class="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
-            {{ sessions.currentSession?.title || '新会话' }}
-          </h2>
-          <span
-            v-if="statusCard"
-            class="shrink-0 rounded-full px-3 py-1 text-[11px] font-medium"
-            :class="statusCard.cls"
-          >
-            {{ statusCard.text }}
-          </span>
-        </div>
-
         <!-- 消息列表 -->
         <div ref="messageListRef" class="flex-1 overflow-y-auto">
           <!-- 消息列表占满聊天区（不设固定最大宽度）：

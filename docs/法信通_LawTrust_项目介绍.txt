@@ -73,8 +73,10 @@ autodl-tmp/                          # 项目根目录
 ├── src/                             # 核心业务代码
 │   ├── config.py                    # 全局配置（模型路径、阈值、权重等）
 │   ├── llm/                         # LLM 封装与 RAG 上下文格式化
-│   │   ├── qwen_model.py            # 双模式门面：本地推理 / 百炼 API 分发 + 多模式 system prompt
-│   │   ├── api_client.py            # 百炼 OpenAI 兼容客户端（重试/超时/流式解析/错误分类）
+│   │   ├── model_registry.py        # 模型注册表：7 个百炼模型 + 离线引擎就绪检测（新增模型=加一行）
+│   │   ├── base.py                  # 统一模型接口（generate/generate_stream/能力标签）
+│   │   ├── qwen_model.py            # 门面：本地推理 / 多模型 API 分发（按请求透传 model_id）+ 多模式 system prompt
+│   │   ├── api_client.py            # OpenAI 兼容客户端（多模型注册表驱动，重试/超时/流式解析/错误分类）
 │   │   └── rag_context.py           # 检索法条编号化参考块
 │   ├── knowledge_base/              # 向量知识库
 │   │   ├── embedder.py              # bge 嵌入模型

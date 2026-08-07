@@ -1,7 +1,10 @@
-"""Qwen 模型封装（双模式：本地 Qwen2.5-7B 推理 / 阿里云百炼 API）。
+"""模型门面（双模式：本地 Qwen2.5-7B 推理 / 多模型 API 引擎）。
 
 懒加载 + RAG 上下文注入；对外接口 generate / generate_stream 在两种模式下一致，
 调用方（answer_pipeline / self_consistency / SSE 层）无需感知 provider 差异。
+
+阶段八改造：模型选择按请求透传（model_id 参数），由模型注册表解析；
+不再依赖实例级 provider 字段决定单次请求用哪个模型。
 """
 from typing import Dict, Generator, List, Optional
 import threading
@@ -10,6 +13,8 @@ import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, TextIteratorStreamer
 from src.config import Config
 from src.llm.api_client import APIClient
+from src.llm.base import BaseLLMModel
+from src.llm.model_registry import ModelSpec, get_api_model_list, resolve_model_spec
 
 
 _SYSTEM_PROMPT_LEGAL = """你是一名专业的中国法律助手，精通中国现行有效法律法规。
@@ -52,16 +57,23 @@ def get_system_prompt(intent: str = "legal_qa") -> str:
     return _SYSTEM_PROMPT_LEGAL
 
 
-class QwenModel:
+class QwenModel(BaseLLMModel):
     def __init__(
         self,
         model_path: str = None,
         device: str = None,
         provider: str = None,
         api_client: APIClient = None,
+        model_id: Optional[str] = None,
     ):
-        """provider: "api" = 百炼 API（默认走 Config.LLM_PROVIDER）| "local" = 本地推理。"""
+        """provider: "api" = 百炼 API（默认走 Config.LLM_PROVIDER）| "local" = 本地推理。
+
+        model_id: 默认模型 id（未指定时 API 模式取 Config.DEFAULT_API_MODEL）。
+        注意：model_id 只决定「未显式传参时的兜底」，单次请求仍以 generate 的
+        model_id 参数为准（并发请求不会互相串模型）。
+        """
         self.provider = provider or Config.LLM_PROVIDER
+        self.model_id = model_id
         self.model_path = model_path or Config.LLM_MODEL_PATH
         req = device or Config.LLM_DEVICE
         self.device = req if req != "cuda" or torch.cuda.is_available() else "cpu"
@@ -69,6 +81,49 @@ class QwenModel:
         self._tokenizer: Optional[AutoTokenizer] = None
         # API 模式：key 缺失会在构造时抛中文 RuntimeError（服务端 lifespan 已兜底降级）
         self._api = api_client or (APIClient() if self.provider == "api" else None)
+        # 按 base_url 缓存的 API 客户端（多供应商预留；本期全部为百炼同一客户端）
+        self._api_clients: Dict[str, APIClient] = {}
+
+    # ------------------------------------------------------------------
+    # 模型解析
+    # ------------------------------------------------------------------
+
+    def _resolve_model(self, model_id: Optional[str]) -> ModelSpec:
+        """解析模型：显式参数 > 构造默认 > 全局默认 / 本地。未知或未启用抛 ValueError。"""
+        mid = model_id or self.model_id
+        if not mid:
+            mid = "local" if self.provider == "local" else Config.DEFAULT_API_MODEL
+        return resolve_model_spec(mid)
+
+    def _get_api_client(self, spec: ModelSpec) -> APIClient:
+        """按 base_url 获取/创建 API 客户端（Key 统一从 spec.key_env 环境变量读取）。"""
+        if spec.base_url not in self._api_clients:
+            self._api_clients[spec.base_url] = APIClient(
+                base_url=spec.base_url,
+                provider_label="百炼" if spec.provider == "dashscope" else spec.provider,
+            )
+        return self._api_clients[spec.base_url]
+
+    # ------------------------------------------------------------------
+    # BaseLLMModel 契约
+    # ------------------------------------------------------------------
+
+    @property
+    def model_name(self) -> str:
+        """当前默认模型的展示名（如 "Qwen3.7 Plus"）。"""
+        return self._resolve_model(None).display_name
+
+    @property
+    def capabilities(self) -> Dict:
+        """能力标签：是否本地 / 是否流式 / 价格档位 / 能力说明。"""
+        spec = self._resolve_model(None)
+        return {
+            "is_local": spec.provider == "local",
+            "is_streaming": True,
+            "price_tier": spec.price_tier,
+            "capabilities": spec.capabilities,
+            "model_id": spec.id,
+        }
 
     # ------------------------------------------------------------------
     # Lazy loading
@@ -79,7 +134,11 @@ class QwenModel:
             return
         if self.provider == "api":
             # API 模式不加载本地模型；_api 已在 __init__ 构造（key 缺失已抛错）
-            print(f"Using API provider: {Config.API_MODEL} (base: {Config.API_BASE_URL})")
+            spec = self._resolve_model(None)
+            print(
+                f"Using API provider: {spec.id} (base: {spec.base_url})"
+                f"，可用模型：{', '.join(m.id for m in get_api_model_list())}"
+            )
             return
         print(f"Loading LLM from {self.model_path} …")
         self._tokenizer = AutoTokenizer.from_pretrained(
@@ -151,6 +210,7 @@ class QwenModel:
         context_docs: List[str] = None,
         history: Optional[List[Dict[str, str]]] = None,
         intent_hint: Optional[str] = None,
+        model_id: Optional[str] = None,
     ) -> str:
         system_prompt = system_prompt or _SYSTEM_PROMPT
         temperature = temperature if temperature is not None else Config.LLM_TEMPERATURE
@@ -160,9 +220,13 @@ class QwenModel:
             query, system_prompt, context_docs, history, intent_hint
         )
 
-        # ---- API 分支：百炼 OpenAI 兼容接口 ----
-        if self.provider == "api":
-            return self._api.complete(messages, temperature=temperature, max_tokens=max_new_tokens)
+        spec = self._resolve_model(model_id)
+
+        # ---- API 分支：多模型 OpenAI 兼容接口（按注册表路由） ----
+        if spec.provider != "local":
+            return self._get_api_client(spec).complete(
+                messages, model_id=spec.id, temperature=temperature, max_tokens=max_new_tokens
+            )
 
         # ---- 本地分支：transformers 推理 ----
         text = self.tokenizer.apply_chat_template(
@@ -191,6 +255,7 @@ class QwenModel:
         context_docs: List[str] = None,
         history: Optional[List[Dict[str, str]]] = None,
         intent_hint: Optional[str] = None,
+        model_id: Optional[str] = None,
     ) -> Generator[str, None, None]:
         """Yield decoded text chunks as the model generates."""
         self._load()
@@ -202,10 +267,12 @@ class QwenModel:
             query, system_prompt, context_docs, history, intent_hint
         )
 
-        # ---- API 分支：百炼 OpenAI 兼容接口（流式） ----
-        if self.provider == "api":
-            yield from self._api.complete_stream(
-                messages, temperature=temperature, max_tokens=max_new_tokens
+        spec = self._resolve_model(model_id)
+
+        # ---- API 分支：多模型 OpenAI 兼容接口（流式） ----
+        if spec.provider != "local":
+            yield from self._get_api_client(spec).complete_stream(
+                messages, model_id=spec.id, temperature=temperature, max_tokens=max_new_tokens
             )
             return
 

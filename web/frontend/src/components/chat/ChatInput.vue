@@ -2,6 +2,7 @@
 import { nextTick, ref } from 'vue'
 import { NButton, NIcon, NSwitch } from 'naive-ui'
 import { SendOutline, StopOutline } from '@vicons/ionicons5'
+import ModelSelector from '@/components/chat/ModelSelector.vue'
 import { useSettingsStore } from '@/stores/settings'
 
 const settings = useSettingsStore()
@@ -58,11 +59,11 @@ defineExpose({ getInput, setInput, clearInput, focus })
 <template>
   <!-- 悬浮输入区：满宽白卡，左右边缘与上方消息气泡（贴左/贴右）对齐；
        收起右侧评估面板时随 flex 自适应同步变宽 -->
-  <div class="px-4 pb-4 pt-2">
+  <div class="px-4 pb-3 pt-2">
     <div
       class="w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg transition-shadow focus-within:border-blue-400 focus-within:shadow-xl dark:border-slate-700 dark:bg-slate-800"
     >
-      <!-- 输入行 -->
+      <!-- 输入行：仅文本域（模型选择器与发送按钮在下方右下角，参考 DeepSeek 布局） -->
       <div class="flex items-end gap-2 px-3 pt-2">
         <textarea
           ref="textareaRef"
@@ -73,34 +74,11 @@ defineExpose({ getInput, setInput, clearInput, focus })
           @keydown="onKeydown"
           @input="autoGrow"
         />
-        <n-button
-          v-if="streaming"
-          type="error"
-          quaternary
-          round
-          title="停止生成"
-          @click="emit('cancel')"
-        >
-          <template #icon>
-            <n-icon :component="StopOutline" />
-          </template>
-        </n-button>
-        <n-button
-          v-else
-          type="primary"
-          round
-          :disabled="!input.trim()"
-          @click="send"
-        >
-          <template #icon>
-            <n-icon :component="SendOutline" />
-          </template>
-        </n-button>
       </div>
 
-      <!-- 微型 Toggle 行：RAG 检索 / 自一致性评估 + 免责提示小字 -->
+      <!-- 底部行：左侧功能开关，右侧模型选择器 + 发送/停止按钮 -->
       <div
-        class="flex items-center justify-between border-t border-slate-100 px-3 pb-2 pt-1.5 dark:border-slate-700"
+        class="flex items-center justify-between border-t border-slate-100 px-3 py-1.5 dark:border-slate-700"
       >
         <div class="flex items-center gap-4">
           <label class="flex cursor-pointer select-none items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
@@ -112,10 +90,38 @@ defineExpose({ getInput, setInput, clearInput, focus })
             自一致性评估
           </label>
         </div>
-        <span class="hidden text-[11px] text-slate-400 sm:inline">
-          回答由 AI 生成，仅供参考
-        </span>
+        <div class="flex items-center gap-1.5">
+          <ModelSelector />
+          <n-button
+            v-if="streaming"
+            type="error"
+            quaternary
+            round
+            title="停止生成"
+            @click="emit('cancel')"
+          >
+            <template #icon>
+              <n-icon :component="StopOutline" />
+            </template>
+          </n-button>
+          <n-button
+            v-else
+            type="primary"
+            round
+            :disabled="!input.trim()"
+            @click="send"
+          >
+            <template #icon>
+              <n-icon :component="SendOutline" />
+            </template>
+          </n-button>
+        </div>
       </div>
+    </div>
+
+    <!-- 免责提示（卡片外底部居中） -->
+    <div class="mt-2 text-center text-[11px] text-slate-400 dark:text-slate-500">
+      回答由 AI 生成，仅供参考
     </div>
   </div>
 </template>

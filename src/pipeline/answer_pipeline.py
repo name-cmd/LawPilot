@@ -59,6 +59,8 @@ class PipelineContext:
     use_rag: bool = True
     history: Optional[List[Dict[str, str]]] = None
     user_documents: Optional[List[Dict]] = None
+    # 用户选择的模型 id（"auto" 已在路由层解析为具体 id；None = 走引擎默认）
+    model_id: Optional[str] = None
 
 
 class AnswerPipeline:
@@ -86,6 +88,7 @@ class AnswerPipeline:
         max_regeneration: int = None,
         history: Optional[List[Dict[str, str]]] = None,
         user_documents: Optional[List[Dict]] = None,
+        model_id: Optional[str] = None,
     ) -> Dict:
         max_regeneration = (
             max_regeneration
@@ -105,6 +108,7 @@ class AnswerPipeline:
                 query=query,
                 intent=intent,
                 history=history,
+                model_id=model_id,
             )
 
         rewrite = (
@@ -149,6 +153,7 @@ class AnswerPipeline:
             context_docs=context_docs,
             history=history,
             intent_hint=intent_hint,
+            model_id=model_id,
         )
 
         verification = (
@@ -174,6 +179,7 @@ class AnswerPipeline:
                 context_docs=context_docs,
                 history=history,
                 intent_hint=intent_hint,
+                model_id=model_id,
             )
             verification = self.verifier.verify(
                 response, retrieved_docs=retrieved_docs
@@ -190,6 +196,7 @@ class AnswerPipeline:
                 context_docs=context_docs,
                 history=history,
                 intent_hint=intent_hint,
+                model_id=model_id,
             )
             verification = self.verifier.verify(
                 response, retrieved_docs=retrieved_docs
@@ -203,6 +210,7 @@ class AnswerPipeline:
                 temperatures=Config.TEMPERATURE_RANGE[:n_consistency_samples],
                 context_docs=context_docs,
                 history=history,
+                model_id=model_id,
             )
 
         trust_report = None
@@ -236,6 +244,7 @@ class AnswerPipeline:
         use_rag: bool = True,
         history: Optional[List[Dict[str, str]]] = None,
         user_documents: Optional[List[Dict]] = None,
+        model_id: Optional[str] = None,
     ) -> PipelineContext:
         user_documents = self._truncate_user_documents(user_documents)
 
@@ -253,6 +262,7 @@ class AnswerPipeline:
                 use_rag=False,
                 system_prompt=get_system_prompt(intent.intent),
                 user_documents=user_documents,
+                model_id=model_id,
             )
 
         rewrite = (
@@ -305,6 +315,7 @@ class AnswerPipeline:
             use_rag=use_rag,
             history=history,
             user_documents=user_documents,
+            model_id=model_id,
         )
 
     def generate_answer_stream(
@@ -316,6 +327,7 @@ class AnswerPipeline:
                 system_prompt=ctx.system_prompt,
                 context_docs=None,
                 history=ctx.history,
+                model_id=ctx.model_id,
             )
             return
 
@@ -325,6 +337,7 @@ class AnswerPipeline:
             context_docs=ctx.context_docs,
             history=ctx.history,
             intent_hint=ctx.intent_hint,
+            model_id=ctx.model_id,
         )
 
     def run_fast(
@@ -333,6 +346,7 @@ class AnswerPipeline:
         use_rag: bool = True,
         history: Optional[List[Dict[str, str]]] = None,
         user_documents: Optional[List[Dict]] = None,
+        model_id: Optional[str] = None,
     ) -> Tuple[PipelineContext, Optional[Dict]]:
         """Prepare context and metadata without LLM generation or verification."""
         ctx = self.prepare_context(
@@ -340,6 +354,7 @@ class AnswerPipeline:
             use_rag=use_rag,
             history=history,
             user_documents=user_documents,
+            model_id=model_id,
         )
 
         if ctx.intent.intent in ("greeting", "general_non_legal"):
@@ -392,6 +407,7 @@ class AnswerPipeline:
                 temperatures=Config.TEMPERATURE_RANGE[:n_consistency_samples],
                 context_docs=ctx.context_docs,
                 history=ctx.history,
+                model_id=ctx.model_id,
             )
 
         trust_report = None
@@ -418,6 +434,7 @@ class AnswerPipeline:
         query: str,
         intent: IntentResult,
         history: Optional[List[Dict[str, str]]],
+        model_id: Optional[str] = None,
     ) -> Dict:
         system_prompt = get_system_prompt(intent.intent)
         response = self.model.generate(
@@ -425,6 +442,7 @@ class AnswerPipeline:
             system_prompt=system_prompt,
             context_docs=None,
             history=history,
+            model_id=model_id,
         )
         trust_report = None
         return {

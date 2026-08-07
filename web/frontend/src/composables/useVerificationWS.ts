@@ -28,10 +28,13 @@ export function useVerificationWS() {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
     const ws = new WebSocket(`${proto}//${location.host}/ws/verification/${messageId}`)
     sockets.set(messageId, ws)
+    console.log('[verification-ws] 连接', messageId)
 
     let retries = 0
+    ws.onopen = () => console.log('[verification-ws] 已打开', messageId)
     ws.onmessage = (ev) => {
       try {
+        console.log('[verification-ws] 收到消息', messageId, ev.data.slice(0, 120))
         const data = JSON.parse(ev.data) as VerificationComplete | VerificationError
         if (data.type === 'verification_complete') {
           handlers.onComplete(data)
@@ -46,6 +49,7 @@ export function useVerificationWS() {
     }
     // 网络抖动重试：1s / 3s 各一次
     ws.onerror = () => {
+      console.warn('[verification-ws] 错误', messageId, ws.readyState)
       if (ws.readyState === WebSocket.CLOSED && retries < 2) {
         retries += 1
         setTimeout(() => {
@@ -53,6 +57,7 @@ export function useVerificationWS() {
         }, retries === 1 ? 1000 : 3000)
       }
     }
+    ws.onclose = (ev: CloseEvent) => console.log('[verification-ws] 已关闭', messageId, ev.code)
   }
 
   function close(messageId: string): void {

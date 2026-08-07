@@ -39,7 +39,12 @@ class Config:
     # 百炼 OpenAI 兼容接口地址（华北2北京地域）
     API_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     # 默认主模型：qwen3.7-plus（性价比高、256K 上下文；免费额度用尽可切 qwen3.6-plus-2026-04-02 快照版，额度独立）
-    API_MODEL = "qwen3.7-plus"
+    # 支持环境变量 API_MODEL 覆盖（.env 中设置，与 .env.example 说明保持一致）
+    API_MODEL = os.environ.get("API_MODEL", "qwen3.7-plus")
+    # 全局默认模型（Auto 跟随；可被前端设置面板传回的 global_model 覆盖）。
+    # 可选值：qwen3.7-plus / qwen-turbo / qwen3.7-max / deepseek-v4-flash-0731 /
+    #         deepseek-v4-pro / kimi-k2.6 / glm-5.2（详见 src/llm/model_registry.py）
+    DEFAULT_API_MODEL = os.environ.get("DEFAULT_API_MODEL", API_MODEL)
     # API Key 只从环境变量 / .env 读取，绝不硬编码（阿里云百炼控制台 → API-KEY 管理）
     API_KEY_ENV = "DASHSCOPE_API_KEY"
     # qwen3 系列默认开启思考模式（多输出推理 token、增加成本与延迟），显式关闭

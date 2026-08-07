@@ -1,6 +1,7 @@
 """
 LawTrust (法信通) FastAPI backend.
 """
+import asyncio
 import json
 import sys
 from pathlib import Path
@@ -20,6 +21,12 @@ from src.config import Config
 from src.knowledge_base.embedder import LawEmbedder
 from src.knowledge_base.vector_store import LawVectorStore
 from src.llm.qwen_model import QwenModel
+from src.llm.model_registry import (
+    ModelSpec,
+    check_local_engine_ready,
+    get_api_model_list,
+    resolve_model_spec,
+)
 from src.citation_verifier.citation_verifier import CitationVerifier
 from src.uncertainty.self_consistency import SelfConsistencyChecker
 from src.pipeline.answer_pipeline import AnswerPipeline
@@ -47,7 +54,7 @@ from web.backend.schemas import (
 from src.document_processing import DocumentExtractor
 from web.backend.task_registry import TaskStatus, get_task_registry
 from web.backend.ws_manager import get_ws_manager
-from web.backend.verification_worker import run_verification_task
+from web.backend.verification_worker import bind_main_loop, run_verification_task
 
 # 测试阶段固定账号（生产环境应改为数据库 + 哈希密码）
 _AUTH_USERS = {"root": "123456"}
@@ -90,6 +97,32 @@ def _build_refusal_response(query: str, guard_result) -> dict:
     }
 
 
+def _resolve_model(req_model: Optional[str], global_model: Optional[str]) -> ModelSpec:
+    """解析用户模型选择 → 具体模型条目。
+
+    优先级：请求显式 id > auto（→ 前端设置面板的 global_model → .env DEFAULT_API_MODEL）。
+    未知 id 或离线引擎不可用 → HTTP 400 中文提示。
+    """
+    mid = req_model or "auto"
+    if mid == "auto":
+        mid = global_model or Config.DEFAULT_API_MODEL
+    if mid == "local":
+        ready = check_local_engine_ready()
+        if not ready["available"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"离线引擎当前不可用：{ready['reason']}（需 CUDA GPU 与本地模型文件）",
+            )
+        raise HTTPException(
+            status_code=400,
+            detail="离线引擎暂未启用：请通过服务端配置启动本地模式",
+        )
+    try:
+        return resolve_model_spec(mid)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
 def _build_pipeline() -> AnswerPipeline:
     embedder = LawEmbedder()
     store = LawVectorStore(persist_directory=Config.LAW_DB_DIR, embedder=embedder)
@@ -114,6 +147,8 @@ def _build_pipeline() -> AnswerPipeline:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _pipeline, _store
+    # 绑定主事件循环：后台核验线程通过它把 WebSocket 结果调度回主循环广播
+    bind_main_loop(asyncio.get_running_loop())
     try:
         _pipeline, _store = _build_pipeline()
     except Exception as e:
@@ -209,6 +244,28 @@ def health():
     )
 
 
+@app.get("/api/models")
+def list_models():
+    """模型目录：前端模型选择器与设置面板的数据源（新增模型 = 注册表加一行，前端零改动）。"""
+    return {
+        "api_models": [
+            {
+                "id": m.id,
+                "display_name": m.display_name,
+                "provider": m.provider,
+                "price_tier": m.price_tier,
+                "capabilities": m.capabilities,
+                "is_default": m.is_default,
+                "is_enabled": m.is_enabled,
+                "thinking_supported": m.thinking_supported,
+            }
+            for m in get_api_model_list()
+        ],
+        "local_engine": check_local_engine_ready(),
+        "default_model": Config.DEFAULT_API_MODEL,
+    }
+
+
 @app.post("/api/check-input", response_model=CheckInputResponse)
 def check_input(req: CheckInputRequest):
     result = _input_guard.check(req.query, privacy_confirmed=req.privacy_confirmed)
@@ -296,6 +353,7 @@ def chat(req: ChatRequest):
             status_code=503,
             detail="服务未就绪：请确认向量库已构建且模型路径正确",
         )
+    spec = _resolve_model(req.model, req.global_model)
     try:
         history = [{"role": m.role, "content": m.content} for m in req.history]
         result = _pipeline.run(
@@ -306,6 +364,7 @@ def chat(req: ChatRequest):
             enable_nli=req.enable_nli,
             history=history or None,
             user_documents=_serialize_user_documents(req.user_documents),
+            model_id=spec.id,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -314,6 +373,8 @@ def chat(req: ChatRequest):
     result["refused"] = False
     result["refusal_reason"] = None
     result["input_guard"] = guard.to_dict()
+    result["model_id"] = spec.id
+    result["model_name"] = spec.display_name
     return ChatResponse(**result)
 
 
@@ -350,6 +411,7 @@ def chat_stream(req: ChatStreamRequest, background_tasks: BackgroundTasks):
             detail="服务未就绪：请确认向量库已构建且模型路径正确",
         )
 
+    spec = _resolve_model(req.model, req.global_model)
     history = [{"role": m.role, "content": m.content} for m in req.history]
     message_id = req.message_id
     get_task_registry().create(message_id)
@@ -361,6 +423,18 @@ def chat_stream(req: ChatStreamRequest, background_tasks: BackgroundTasks):
                 use_rag=req.use_rag,
                 history=history or None,
                 user_documents=_serialize_user_documents(req.user_documents),
+                model_id=spec.id,
+            )
+
+            # 首事件必发 meta：携带实际使用的模型（流式中断时消息也有模型记录），
+            # 法律类回答再并入 RAG 检索等元信息
+            yield _sse_event(
+                "meta",
+                {
+                    "model_id": spec.id,
+                    "model_name": spec.display_name,
+                    **(meta or {}),
+                },
             )
 
             if ctx.intent.intent in ("greeting", "general_non_legal"):
@@ -375,12 +449,11 @@ def chat_stream(req: ChatStreamRequest, background_tasks: BackgroundTasks):
                         "answer": answer,
                         "non_legal": True,
                         "intent": ctx.intent.to_dict(),
+                        "model_id": spec.id,
+                        "model_name": spec.display_name,
                     },
                 )
                 return
-
-            if meta:
-                yield _sse_event("meta", meta)
 
             parts = []
             for chunk in _pipeline.generate_answer_stream(ctx):
@@ -398,6 +471,8 @@ def chat_stream(req: ChatStreamRequest, background_tasks: BackgroundTasks):
                     "answer": answer,
                     "message_id": message_id,
                     "trust": partial_trust,
+                    "model_id": spec.id,
+                    "model_name": spec.display_name,
                 },
             )
 

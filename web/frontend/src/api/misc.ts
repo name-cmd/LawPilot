@@ -1,5 +1,5 @@
 import { request } from './client'
-import type { CheckInputResponse } from './types'
+import type { CheckInputResponse, ModelsResponse } from './types'
 
 export function checkInput(query: string, privacyConfirmed: boolean) {
   return request<CheckInputResponse>('/api/check-input', {
@@ -9,6 +9,11 @@ export function checkInput(query: string, privacyConfirmed: boolean) {
       privacy_confirmed: privacyConfirmed === true,
     }),
   })
+}
+
+/** 模型目录（7 个 API 模型 + 离线引擎状态 + 全局默认）——模型选择器/设置面板的数据源 */
+export function fetchModels() {
+  return request<ModelsResponse>('/api/models')
 }
 
 export function autoTitle(query: string) {

@@ -18,6 +18,13 @@ export const useSettingsStore = defineStore('settings', {
     enableNli: true,
     nConsistencySamples: 2,
     privacyConfirmed: false,
+    // ── 模型选择（阶段八）──────────────
+    // 两级选择器第一级：'api'（API 调用）| 'local'（离线调用）
+    modelProvider: 'api' as 'api' | 'local',
+    // 第二级：'auto'（跟随全局默认）| 具体模型 id
+    apiModel: 'auto' as string,
+    // 设置面板的全局默认模型（Auto 跟随它；以后端解析结果为准）
+    globalDefaultModel: 'qwen3.7-plus' as string,
   }),
   actions: {
     toggleTheme() {
