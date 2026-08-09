@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { NTabs, NTabPane, NEmpty, NIcon } from 'naive-ui'
 import { ChevronBackOutline } from '@vicons/ionicons5'
 import TrustEvalPanel from './TrustEvalPanel.vue'
@@ -7,6 +7,7 @@ import ArticleTracePanel from './ArticleTracePanel.vue'
 import CitationVerificationPanel from './CitationVerificationPanel.vue'
 import { useDetailPanelStore } from '@/stores/detailPanel'
 import { useSessionsStore } from '@/stores/sessions'
+import { useVerificationWS } from '@/composables/useVerificationWS'
 import { isLegalAnalysisMeta, isVerificationPending } from '@/utils/answer'
 import type { Message } from '@/stores/sessions'
 
@@ -17,6 +18,7 @@ import type { Message } from '@/stores/sessions'
 
 const detail = useDetailPanelStore()
 const sessions = useSessionsStore()
+const verification = useVerificationWS()
 
 const message = computed<Message | null>(
   () => sessions.sessions.flatMap((s) => s.messages).find((m) => m.id === detail.selectedMsgId) ?? null,
@@ -24,6 +26,23 @@ const message = computed<Message | null>(
 const meta = computed(() => message.value?.meta)
 const isLegal = computed(() => isLegalAnalysisMeta(meta.value))
 const pending = computed(() => isVerificationPending(meta.value))
+
+/**
+ * 自愈重连：选中的消息若仍是「核验中」，重连核验 WS 拉取结果。
+ * 后端 task_registry 对已完成任务会立即重放结果，因此页面刷新、切会话期间错过
+ * 广播的历史卡死消息，点击后一点即恢复；若后端仍在跑，广播到达后照常更新。
+ * （核验结果应用走 sessions.applyVerificationResult，跨会话查找，不会丢）
+ */
+watch(
+  () => [detail.selectedMsgId, meta.value?.verification_status] as const,
+  ([msgId, status]) => {
+    if (!msgId || status !== 'pending') return
+    verification.connect(msgId, {
+      onComplete: (data) => sessions.applyVerificationResult(msgId, data),
+      onError: () => sessions.applyVerificationError(msgId),
+    })
+  },
+)
 </script>
 
 <template>

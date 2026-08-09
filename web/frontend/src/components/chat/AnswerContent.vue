@@ -42,13 +42,14 @@ const sections = computed(() => (props.streaming ? null : parseAnswerSections(pr
         <MarkdownRenderer :content="sec.body" class="text-sm text-ink" />
       </section>
 
-      <!-- 【依据法条】：法典图标，与结论/法律分析同款样式 -->
+      <!-- 【依据法条】：法典图标，与结论/法律分析同款样式；
+           开启条号高亮（highlight-article）：「第X条」品牌蓝加粗与正文区分 -->
       <section v-else class="leading-[1.7]">
         <div class="mb-1.5 flex items-center gap-1.5">
           <n-icon :component="BookOutline" size="16" class="text-brand-500" />
           <h3 class="text-sm font-semibold text-ink">依据法条</h3>
         </div>
-        <MarkdownRenderer :content="sec.body" class="text-sm text-ink" />
+        <MarkdownRenderer :content="sec.body" :highlight-article="true" class="text-sm text-ink" />
       </section>
     </template>
   </div>

@@ -212,6 +212,9 @@ export interface MessageMeta {
   /** pending=核验中；complete=核验完成；error=核验失败（退出"核验中"，展示已有初步评估） */
   verification_status?: 'pending' | 'complete' | 'error'
   refused?: boolean
+  /** 发起时用户选择的模型快照（auto=Auto 模式；local=离线）。左下角角标据此显示：
+      Auto 模式显示「Auto」而非后端解析后的实际模型名 */
+  requested_model?: string
   /** 实际使用的模型（后端 Auto 解析后落定） */
   model_id?: string
   model_name?: string

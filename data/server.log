@@ -1,0 +1,97 @@
+INFO:     Started server process [19816]
+INFO:     Waiting for application startup.
+D:\MyProjects\LawTrust\src\knowledge_base\embedder.py:19: LangChainDeprecationWarning: The class `HuggingFaceEmbeddings` was deprecated in LangChain 0.2.2 and will be removed in 1.0. An updated version of the class exists in the `langchain-huggingface package and should be used instead. To use it run `pip install -U `langchain-huggingface` and import as `from `langchain_huggingface import HuggingFaceEmbeddings``.
+  self._embeddings = HuggingFaceEmbeddings(
+========================================================
+  法信通 LawTrust — 服务启动
+========================================================
+  本机访问：  http://localhost:6006
+            http://127.0.0.1:6006
+  局域网访问：http://10.102.27.177:6006
+  API 文档：  http://localhost:6006/docs
+========================================================
+
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 27889.15it/s]
+D:\MyProjects\LawTrust\src\knowledge_base\vector_store.py:40: LangChainDeprecationWarning: The class `Chroma` was deprecated in LangChain 0.2.9 and will be removed in 1.0. An updated version of the class exists in the `langchain-chroma package and should be used instead. To use it run `pip install -U `langchain-chroma` and import as `from `langchain_chroma import Chroma``.
+  self._db = Chroma(
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:6006 (Press CTRL+C to quit)
+INFO:     127.0.0.1:52803 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52373 - "GET /ui/index.html HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51827 - "GET /ui/assets/index-DY4yghjA.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52373 - "GET /ui/assets/index-D0DUdUxH.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52373 - "POST /api/auth/verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51827 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52373 - "POST /api/auth/logout HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52373 - "GET /figure/sign1.png HTTP/1.1" 304 Not Modified
+INFO:     127.0.0.1:52373 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52373 - "GET /api/models HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64445 - "POST /api/documents/extract HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51868 - "POST /api/session-title HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62226 - "POST /api/check-input HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62226 - "POST /api/chat/stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62439 - "WebSocket /ws/verification/m_1786286396059_rbn4y" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:59870 - "WebSocket /ws/verification/m_1786286396059_rbn4y" [accepted]
+INFO:     connection open
+Using API provider: qwen3.7-plus (base: https://dashscope.aliyuncs.com/compatible-mode/v1)，可用模型：qwen3.7-plus, qwen-turbo, qwen3.7-max, deepseek-v4-flash-0731, deepseek-v4-pro, kimi-k2.6, glm-5.2
+INFO:     127.0.0.1:61700 - "POST /api/documents/extract HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61700 - "POST /api/session-title HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61700 - "POST /api/check-input HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61700 - "POST /api/chat/stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60910 - "WebSocket /ws/verification/m_1786286446507_ga4or" [accepted]
+INFO:     connection open
+Using API provider: qwen3.7-plus (base: https://dashscope.aliyuncs.com/compatible-mode/v1)，可用模型：qwen3.7-plus, qwen-turbo, qwen3.7-max, deepseek-v4-flash-0731, deepseek-v4-pro, kimi-k2.6, glm-5.2
+INFO:     127.0.0.1:63899 - "POST /api/documents/extract HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59605 - "POST /api/session-title HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59605 - "POST /api/check-input HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59605 - "POST /api/chat/stream HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63987 - "WebSocket /ws/verification/m_1786286739740_wn13f" [accepted]
+INFO:     connection open
+Using API provider: qwen3.7-plus (base: https://dashscope.aliyuncs.com/compatible-mode/v1)，可用模型：qwen3.7-plus, qwen-turbo, qwen3.7-max, deepseek-v4-flash-0731, deepseek-v4-pro, kimi-k2.6, glm-5.2
+[verification] 任务启动 m_1786286739740_wn13f
+INFO:     127.0.0.1:56445 - "WebSocket /ws/verification/m_1786286739740_wn13f" [accepted]
+INFO:     connection open
+Loading weights:   0%|          | 0/393 [00:00<?, ?it/s]Loading weights: 100%|██████████| 393/393 [00:00<00:00, 17741.10it/s]
+[API 用量] deepseek-v4-pro: prompt=1199 completion=537 total=1736
+INFO:     127.0.0.1:63250 - "POST /api/session-title HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63250 - "POST /api/check-input HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63250 - "POST /api/chat/stream HTTP/1.1" 200 OK
+Using API provider: qwen3.7-plus (base: https://dashscope.aliyuncs.com/compatible-mode/v1)，可用模型：qwen3.7-plus, qwen-turbo, qwen3.7-max, deepseek-v4-flash-0731, deepseek-v4-pro, kimi-k2.6, glm-5.2
+[API 用量] deepseek-v4-pro: prompt=1199 completion=468 total=1667
+[verification] 广播成功 m_1786286739740_wn13f type=verification_complete
+INFO:     127.0.0.1:58952 - "POST /api/session-title HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58952 - "POST /api/check-input HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58952 - "POST /api/chat/stream HTTP/1.1" 200 OK
+Using API provider: qwen3.7-plus (base: https://dashscope.aliyuncs.com/compatible-mode/v1)，可用模型：qwen3.7-plus, qwen-turbo, qwen3.7-max, deepseek-v4-flash-0731, deepseek-v4-pro, kimi-k2.6, glm-5.2
+[verification] 任务启动 m_1786286782039_4al4s
+INFO:     127.0.0.1:50037 - "WebSocket /ws/verification/m_1786286782039_4al4s" [accepted]
+INFO:     connection open
+[API 用量] deepseek-v4-pro: prompt=702 completion=247 total=949
+[API 用量] deepseek-v4-pro: prompt=702 completion=199 total=901
+[verification] 广播成功 m_1786286782039_4al4s type=verification_complete
+INFO:     127.0.0.1:56032 - "GET /ui/index.html HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58045 - "GET /ui/assets/index-DY4yghjA.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56032 - "GET /ui/assets/index-D0DUdUxH.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56032 - "POST /api/auth/verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56032 - "GET /api/models HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56032 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:56032 - "GET /ui/index.html HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56032 - "GET /ui/assets/index-D0DUdUxH.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58045 - "GET /ui/assets/index-DY4yghjA.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56032 - "POST /api/auth/verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56032 - "GET /api/models HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56032 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:56652 - "POST /api/auth/logout HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62630 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62630 - "GET /api/models HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62630 - "POST /api/session-title HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54569 - "POST /api/check-input HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54569 - "POST /api/chat/stream HTTP/1.1" 200 OK
+Using API provider: qwen3.7-plus (base: https://dashscope.aliyuncs.com/compatible-mode/v1)，可用模型：qwen3.7-plus, qwen-turbo, qwen3.7-max, deepseek-v4-flash-0731, deepseek-v4-pro, kimi-k2.6, glm-5.2
+[verification] 任务启动 m_1786287771828_vwppq
+INFO:     127.0.0.1:60242 - "WebSocket /ws/verification/m_1786287771828_vwppq" [accepted]
+INFO:     connection open
+[API 用量] deepseek-v4-pro: prompt=631 completion=361 total=992
+[API 用量] deepseek-v4-pro: prompt=631 completion=357 total=988
+[verification] 广播成功 m_1786287771828_vwppq type=verification_complete

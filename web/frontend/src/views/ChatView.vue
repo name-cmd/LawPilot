@@ -6,9 +6,12 @@ import SessionSidebar from '@/components/layout/SessionSidebar.vue'
 import DetailPanel from '@/components/layout/DetailPanel.vue'
 import ChatInput from '@/components/chat/ChatInput.vue'
 import ChatMessage from '@/components/chat/ChatMessage.vue'
+import ExportBar from '@/components/chat/ExportBar.vue'
 import PrivacyConfirmModal from '@/components/chat/PrivacyConfirmModal.vue'
+import { exportTrustReport, getExportableMessages } from '@/utils/report'
 import { useSessionsStore } from '@/stores/sessions'
 import { useModelsStore } from '@/stores/models'
+import { useSettingsStore } from '@/stores/settings'
 import { useDetailPanelStore } from '@/stores/detailPanel'
 import { useChatStream, isAbortError } from '@/composables/useChatStream'
 import { useVerificationWS } from '@/composables/useVerificationWS'
@@ -16,9 +19,12 @@ import { checkInput } from '@/api/misc'
 import { isApiError } from '@/api/client'
 import { uid } from '@/utils/id'
 import { isLegalAnalysisMeta } from '@/utils/answer'
+import type { Message, MessageAttachment, PendingAttachment } from '@/stores/sessions'
+import type { UserDocument } from '@/api/types'
 
 const sessions = useSessionsStore()
 const models = useModelsStore()
+const settings = useSettingsStore()
 const detail = useDetailPanelStore()
 const toast = useMessage()
 const { ask: askStream, cancel } = useChatStream()
@@ -31,10 +37,91 @@ const scrollToBottom = () => {
     if (messageListRef.value) messageListRef.value.scrollTop = messageListRef.value.scrollHeight
   })
 }
+
+/**
+ * 附件文本截断后存入用户消息：与后端 Config.DOC_MAX_CONTEXT_CHARS（12000 字符）
+ * 对齐——后端只会用前 12000 字符，保存更多是浪费 localStorage；
+ * 重新生成时把截断后的文本回传，与首次发送的文档上下文一致。
+ */
+function truncateAttachmentTexts(docs: PendingAttachment[]): MessageAttachment[] {
+  const MAX_DOC_CHARS = 12000
+  let total = 0
+  const out: MessageAttachment[] = []
+  for (const d of docs) {
+    const text = (d.text || '').trim()
+    if (!text) continue
+    const remaining = MAX_DOC_CHARS - total
+    if (remaining <= 0) break
+    out.push({
+      filename: d.filename,
+      char_count: d.char_count,
+      text: text.length > remaining ? text.slice(0, remaining) + '\n…（文档内容已截断）' : text,
+    })
+    total += Math.min(text.length, remaining)
+  }
+  return out
+}
 watch(
   () => sessions.currentSession?.messages.map((m) => m.content).join('|'),
   () => scrollToBottom(),
 )
+
+// 切换会话：右侧详情面板同步显示新会话最新一条法律回答的核验详情
+// （selectedMsgId 还指着旧会话消息时面板会残留旧内容；新会话无法律回答则清空选择显示空态）
+watch(
+  () => sessions.currentSessionId,
+  () => {
+    const msgs = sessions.currentSession?.messages ?? []
+    const last = [...msgs]
+      .reverse()
+      .find((m) => m.role === 'assistant' && !m.loading && isLegalAnalysisMeta(m.meta))
+    if (last) detail.autoShow(last.id)
+    else detail.clearSelection()
+    // 新建/切换会话时退出导出模式（legacy 语义）
+    exitExportMode()
+  },
+)
+
+// ── 导出可信评估报告（功能 36）：导出模式为纯视图状态，放局部 ref 不入 store（避免被持久化） ──
+const exportMode = ref(false)
+const exportSelected = ref<Set<string>>(new Set())
+
+const exportableMessages = computed(() => getExportableMessages(sessions.currentSession))
+const hasLegalMessages = computed(() => exportableMessages.value.length > 0)
+const exportAllSelected = computed(
+  () => exportableMessages.value.length > 0 && exportableMessages.value.every((m) => exportSelected.value.has(m.id)),
+)
+
+function toggleExportMode() {
+  if (!hasLegalMessages.value) {
+    toast.info('当前对话暂无可导出的法律问答')
+    return
+  }
+  exportMode.value = !exportMode.value
+  exportSelected.value = new Set()
+}
+function exitExportMode() {
+  exportMode.value = false
+  exportSelected.value = new Set()
+}
+function toggleExportAll(checked: boolean) {
+  if (checked) exportableMessages.value.forEach((m) => exportSelected.value.add(m.id))
+  else exportSelected.value.clear()
+}
+function toggleExportMsg(id: string, checked: boolean) {
+  if (checked) exportSelected.value.add(id)
+  else exportSelected.value.delete(id)
+}
+function onExport() {
+  const session = sessions.currentSession
+  if (!session || exportSelected.value.size === 0) return
+  if (exportTrustReport(session, exportSelected.value)) {
+    toast.info('报告已生成，请在打印对话框中选择「另存为 PDF」')
+    exitExportMode()
+  } else {
+    toast.warning('请允许弹出窗口以导出报告')
+  }
+}
 
 // 隐私确认弹窗
 const privacyShow = ref(false)
@@ -80,12 +167,20 @@ async function ask(privacyConfirmed = false) {
   if (sessions.loading) return
   const inputRef = chatInputRef.value
   const rawQuery = (inputRef?.getInput() || '').trim()
-  if (!rawQuery) {
-    toast.warning('请输入法律问题')
+  // 附件：已解析完成的文档（旧版 readyDocs 语义）
+  const readyDocs = sessions.pendingAttachments.filter((a) => !a.uploading && a.text)
+  if (sessions.pendingAttachments.some((a) => a.uploading)) {
+    toast.warning('文档正在解析，请稍候')
+    return
+  }
+  if (!rawQuery && !readyDocs.length) {
+    toast.warning('请输入法律问题或上传文档')
     return
   }
   const confirmed = privacyConfirmed === true
-  const queryForCheck = rawQuery
+  // 仅上传文档不输入文字：自动以文档分析请求作为提问（功能 20 语义）
+  const queryForCheck = rawQuery || '请分析以上上传的文档内容，指出关键条款与法律风险。'
+  const displayQuery = rawQuery || '（基于上传文档的分析请求）'
 
   const session = sessions.currentSession
   if (!session) {
@@ -93,9 +188,13 @@ async function ask(privacyConfirmed = false) {
     return
   }
 
-  // 1. 先占位（用户消息 + 助手思考气泡），再走输入守卫
-  const { userMsg, assistantMsg } = sessions.addQuestionMessages(rawQuery, [])
-  sessions.autoTitle(session.id, rawQuery)
+  // 1. 先占位（用户消息 + 助手思考气泡），再走输入守卫；附件随消息展示（文件名+字数），
+  //    文本截断后一并存入（重新生成时回传文档上下文）
+  const { userMsg, assistantMsg } = sessions.addQuestionMessages(
+    displayQuery,
+    truncateAttachmentTexts(readyDocs),
+  )
+  sessions.autoTitle(session.id, displayQuery)
   inputRef?.clearInput()
   scrollToBottom()
 
@@ -126,23 +225,38 @@ async function ask(privacyConfirmed = false) {
   // 3. 隐私确认：弹窗征得同意后带 privacy_confirmed=true 重发
   if (check.needs_privacy_confirm && !confirmed) {
     sessions.removeMessages([assistantMsg.id, userMsg.id])
-    inputRef?.setInput(check.critical_pii_masked ? query : rawQuery)
+    // 回填 queryForCheck（纯文档提问时 rawQuery 为空，回填空串会丢掉文档分析请求）
+    inputRef?.setInput(check.critical_pii_masked ? query : queryForCheck)
     privacyMessage.value = check.privacy_warning || '您的问题包含疑似个人信息，请确认是否继续发送。'
     privacyShow.value = true
     return
   }
 
+  // 4. 发起问答（附件清空移入 runChatPipeline：buildChatPayload 组装 user_documents 之后再清空，
+  //    否则 user_documents 恒为空——上一轮修复遗漏的时序 bug；隐私确认未通过时提前 return 不走到这里）
   await runChatPipeline(query, userMsg.id, assistantMsg.id, confirmed || !check.needs_privacy_confirm)
 }
 
 /** 流式问答 + 自动降级 + 错误回滚（旧版 runChatPipeline 语义） */
-async function runChatPipeline(query: string, userMsgId: string, assistantMsgId: string, privacyConfirmed: boolean) {
+async function runChatPipeline(
+  query: string,
+  userMsgId: string,
+  assistantMsgId: string,
+  privacyConfirmed: boolean,
+  documents?: UserDocument[],
+) {
   sessions.loading = true
   sessions.updateMessage(assistantMsgId, { thinkingText: '正在准备分析…' })
   scrollToBottom()
 
   const payload = sessions.buildChatPayload(query, assistantMsgId, privacyConfirmed)
+  // 附件已组装进 payload.user_documents，随即清空待发送队列（隐私确认重入场景在 ask 中已保留）
+  sessions.pendingAttachments = []
+  // 重新生成时附件队列已空，文档上下文改从消息附件里保存的截断文本取（覆盖 payload）
+  if (documents) payload.user_documents = documents
   let metaReceived = false
+  // 发起时选择的模型快照：Auto 模式下左下角显示「Auto」，而非后端解析后的实际模型名
+  const requestedModel = settings.apiModel
 
   try {
     try {
@@ -160,6 +274,7 @@ async function runChatPipeline(query: string, userMsgId: string, assistantMsgId:
               citation_verification: meta.citation_verification,
               verification_status: 'pending',
               regeneration_attempts: 0,
+              requested_model: requestedModel,
               model_id: meta.model_id,
               model_name: meta.model_name,
             },
@@ -182,8 +297,12 @@ async function runChatPipeline(query: string, userMsgId: string, assistantMsgId:
             patch.meta = {
               ...(m?.meta || {}),
               intent: done.intent || { intent: 'greeting' },
+              requested_model: requestedModel,
               model_id: done.model_id ?? m?.meta?.model_id,
               model_name: done.model_name ?? m?.meta?.model_name,
+              // 非法律回答后端不启动引用核验任务：清除 onMeta 写入的「核验中」
+              // 状态，避免气泡永久显示「引用核验中…」
+              verification_status: undefined,
             }
             // 寒暄等非法律回答：关闭详情面板，避免旧评估误导
             detail.close()
@@ -194,40 +313,27 @@ async function runChatPipeline(query: string, userMsgId: string, assistantMsgId:
               ...meta,
               trust: done.trust,
               verification_status: 'pending',
+              requested_model: requestedModel,
               model_id: done.model_id ?? meta.model_id,
               model_name: done.model_name ?? meta.model_name,
             }
             // 法律类回答：自动在右侧面板展示可信评估（追问时自动切到最新回答）
             detail.autoShow(assistantMsgId)
+          } else {
+            // RAG 未命中或纯文档分析：后端不启动引用核验任务，
+            // 清除 onMeta 写入的「核验中」状态，避免消息永久显示「引用核验中…」
+            const m = sessions.currentSession?.messages.find((x) => x.id === assistantMsgId)
+            patch.meta = { ...(m?.meta || {}), verification_status: undefined }
           }
           sessions.updateMessage(assistantMsgId, patch as never)
-          // 法律类回答：连接核验 WebSocket，等待后台完整核验结果
-          if (!done.non_legal && metaReceived) {
+          // 仅 RAG 回答会启动核验后台任务（done.trust 即后端 score_fast 结果），连接 WS 等待完整核验
+          if (done.trust && metaReceived) {
             verification.connect(assistantMsgId, {
-              onComplete: (data) => {
-                const m = sessions.currentSession?.messages.find((x) => x.id === assistantMsgId)
-                const meta = m?.meta || {}
-                sessions.updateMessage(assistantMsgId, {
-                  meta: {
-                    ...meta,
-                    citation_verification: data.citation_verification,
-                    consistency: data.consistency,
-                    trust: data.trust,
-                    validity_warnings: data.validity_warnings || [],
-                    verification_status: 'complete',
-                    regeneration_attempts: data.regeneration_attempts || 0,
-                  },
-                })
-              },
+              // 应用结果走 sessions 跨会话 action：核验期间用户切到别的会话也能正确落盘
+              onComplete: (data) => sessions.applyVerificationResult(assistantMsgId, data),
               onError: (err) => {
                 // 核验失败防呆：置为 error 退出"核验中"状态，面板展示已有初步评估
-                // （否则详情永远显示"核验中 · 初步回答已生成"，用户以为卡死）
-                const m = sessions.currentSession?.messages.find((x) => x.id === assistantMsgId)
-                if (m) {
-                  sessions.updateMessage(assistantMsgId, {
-                    meta: { ...(m.meta || {}), verification_status: 'error' },
-                  })
-                }
+                sessions.applyVerificationError(assistantMsgId)
                 toast.warning('核验失败：' + err)
               },
             })
@@ -256,6 +362,7 @@ async function runChatPipeline(query: string, userMsgId: string, assistantMsgId:
               citation_verification: data.citation_verification,
               regeneration_attempts: data.regeneration_attempts || 0,
               verification_status: 'complete',
+              requested_model: requestedModel,
               model_id: data.model_id as string | undefined,
               model_name: data.model_name as string | undefined,
             }
@@ -288,6 +395,52 @@ async function runChatPipeline(query: string, userMsgId: string, assistantMsgId:
   }
 }
 
+/**
+ * 重新生成回答（legacy regenerateAnswer 语义）：
+ * 移除旧回答 → 追加新占位 → 按原问题重跑流水线。
+ * 用户消息保留（历史上下文与附件截断文本都从它取），重答完成后
+ * onDone 会自动展示可信评估并连接核验 WS，无需额外处理。
+ */
+function onRegenerate(assistantMsgId: string) {
+  if (sessions.loading) {
+    toast.warning('请等待当前回复完成')
+    return
+  }
+  const session = sessions.currentSession
+  if (!session) return
+  const idx = session.messages.findIndex((m) => m.id === assistantMsgId)
+  if (idx < 1) return
+  const userMsg = session.messages[idx - 1]
+  if (userMsg.role !== 'user') return
+  // 移除旧回答，追加新占位（userMsg 保留：历史与附件文本都从它取）
+  session.messages.splice(idx, 1)
+  const newAssistant: Message = {
+    id: uid(),
+    role: 'assistant',
+    content: '',
+    loading: true,
+    thinkingText: '正在重新生成回答…',
+    timestamp: Date.now(),
+  }
+  session.messages.push(newAssistant)
+  scrollToBottom()
+  // 纯文档提问时用户消息显示的是占位文案，重新生成需还原为实际请求
+  const query =
+    userMsg.content === '（基于上传文档的分析请求）'
+      ? '请分析以上上传的文档内容，指出关键条款与法律风险。'
+      : userMsg.content
+  // 附件文本（截断后保存在消息上）→ user_documents，重新生成不丢文档上下文
+  const documents: UserDocument[] = (userMsg.attachments || [])
+    .filter((a) => a.text)
+    .map((a) => ({
+      filename: a.filename,
+      text: a.text as string,
+      format: '',
+      char_count: a.char_count,
+    }))
+  runChatPipeline(query, userMsg.id, newAssistant.id, true, documents)
+}
+
 /** 示例问题点击（欢迎页） */
 function onExampleClick(q: string) {
   chatInputRef.value?.setInput(q)
@@ -309,6 +462,16 @@ function onPrivacyConfirm() {
     <div class="flex min-h-0 flex-1">
       <SessionSidebar />
       <main class="flex min-w-0 flex-1 flex-col bg-slate-100/50 dark:bg-slate-900/60">
+        <!-- 导出模式操作栏（消息区上方） -->
+        <ExportBar
+          v-if="exportMode"
+          :selected-count="exportSelected.size"
+          :total-count="exportableMessages.length"
+          :all-selected="exportAllSelected"
+          @toggle-all="toggleExportAll"
+          @export="onExport"
+          @cancel="exitExportMode"
+        />
         <!-- 消息列表 -->
         <div ref="messageListRef" class="flex-1 overflow-y-auto">
           <!-- 消息列表占满聊天区（不设固定最大宽度）：
@@ -342,6 +505,10 @@ function onPrivacyConfirm() {
               v-for="m in sessions.currentSession?.messages"
               :key="m.id"
               :message="m"
+              :export-mode="exportMode"
+              :export-checked="exportSelected.has(m.id)"
+              @toggle-export="(checked: boolean) => toggleExportMsg(m.id, checked)"
+              @regenerate="onRegenerate(m.id)"
             />
           </div>
         </div>
@@ -350,8 +517,10 @@ function onPrivacyConfirm() {
         <ChatInput
           ref="chatInputRef"
           :streaming="sessions.loading"
+          :can-export="hasLegalMessages"
           @send="ask()"
           @cancel="cancel()"
+          @export-mode="toggleExportMode"
         />
       </main>
       <DetailPanel />

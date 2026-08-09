@@ -49,7 +49,7 @@ function formatTime(ts: number): string {
     <!-- 新建会话（深色主按钮） -->
     <div class="p-3">
       <button
-        class="flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white py-2.5 text-[15px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-100"
+        class="flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white py-2.5 text-[15px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
         @click="sessions.createSession(true)"
       >
         <n-icon :component="AddOutline" class="text-base" />

@@ -4,12 +4,15 @@ import { useSettingsStore } from './settings'
 import { autoTitle } from '@/api/misc'
 import { sessionId, uid } from '@/utils/id'
 import { SESSIONS_PREFIX_V2, SESSIONS_PREFIX_V1, migrateJson, userScopedStorage } from '@/utils/storage'
-import type { HistoryItem, MessageMeta } from '@/api/types'
+import type { HistoryItem, MessageMeta, VerificationComplete } from '@/api/types'
 
 // ── 数据结构（与旧版 localStorage 格式一致，迁移零转换） ──
 export interface MessageAttachment {
   filename: string
   char_count: number
+  /** 文档文本（截断至后端 DOC_MAX_CONTEXT_CHARS 上限后保存）：重新生成回答时
+      附件队列已清空，靠它把文档上下文带回给模型 */
+  text?: string
 }
 
 export interface Message {
@@ -128,9 +131,52 @@ export const useSessionsStore = defineStore('sessions', {
       this.currentSession?.messages.push(msg)
     },
 
+    /**
+     * 更新消息（跨会话查找）：消息 id 全局唯一，核验结果经 WS 异步到达时用户可能已
+     * 切到别的会话——若只查当前会话会找不到消息而丢弃结果，消息永远停在「核验中」。
+     * （已在后端日志确认：广播成功但前端不应用，切会话场景必现）
+     */
     updateMessage(id: string, patch: Partial<Message>) {
-      const m = this.currentSession?.messages.find((x) => x.id === id)
-      if (m) Object.assign(m, patch)
+      for (const s of this.sessions) {
+        const m = s.messages.find((x) => x.id === id)
+        if (m) {
+          Object.assign(m, patch)
+          return
+        }
+      }
+    },
+
+    /**
+     * 应用核验结果（WS 广播 / 详情面板自愈重连共用）：跨会话查找消息并合并核验数据。
+     * 与 updateMessage 同样的跨会话语义——核验完成时用户可能在别的会话浏览。
+     */
+    applyVerificationResult(messageId: string, data: VerificationComplete) {
+      for (const s of this.sessions) {
+        const m = s.messages.find((x) => x.id === messageId)
+        if (m) {
+          m.meta = {
+            ...(m.meta || {}),
+            citation_verification: data.citation_verification,
+            consistency: data.consistency,
+            trust: data.trust,
+            validity_warnings: data.validity_warnings || [],
+            verification_status: 'complete',
+            regeneration_attempts: data.regeneration_attempts || 0,
+          }
+          return
+        }
+      }
+    },
+
+    /** 核验失败防呆：跨会话置为 error，退出「核验中」状态（面板展示已有初步评估） */
+    applyVerificationError(messageId: string) {
+      for (const s of this.sessions) {
+        const m = s.messages.find((x) => x.id === messageId)
+        if (m) {
+          m.meta = { ...(m.meta || {}), verification_status: 'error' }
+          return
+        }
+      }
     },
 
     removeMessages(ids: string[]) {

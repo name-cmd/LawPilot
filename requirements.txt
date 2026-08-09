@@ -24,3 +24,5 @@ Pillow>=10.0.0
 # 阿里云百炼 API（LLM 双模式的 api 分支）
 openai>=1.35.0
 python-dotenv>=1.0.0
+# 单元测试（tests/ 目录）
+pytest>=7.0

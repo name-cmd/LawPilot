@@ -45,11 +45,27 @@ _SYSTEM_PROMPT_GENERAL = """你是法信通（LawTrust）智能助手，主要�
 当前问题与法律没有直接关系。请简短、友好地回答；若无法回答，请诚实说明。
 结尾用一句话引导用户提出法律相关问题。不要编造法条，不要使用【结论】【法律分析】【依据法条】结构。"""
 
+_SYSTEM_PROMPT_DOC_ANALYSIS = """你是法信通（LawTrust）智能助手。用户上传了文档并请求分析。
+请以简洁清晰的方式总结文档内容与关键信息，并按需给出分析。
+
+- 若文档内容涉及法律问题（如合同条款、法律风险）：按【结论】【法律分析】【依据法条】
+  结构作答，仅引用与问题直接相关的法条（无法条参考时凭确知知识引用并注明需人工核对）。
+- 若文档与法律无关（如技术文档、项目方案）：直接客观总结文档要点即可——不要套用
+  【结论】【法律分析】【依据法条】结构，不要罗列无关法条；可在开头简要说明该文档为
+  技术/非法律类文档、不涉及具体法律分析，然后总结关键内容；结尾用一句话提示用户：
+  如需法律咨询，可提出具体问题或上传合同等法律文件。
+- 引用文档具体内容时注明出处（如《文件名》）；不确定处诚实说明，不得编造。"""
+
 # backward-compatible alias
 _SYSTEM_PROMPT = _SYSTEM_PROMPT_LEGAL
 
 
-def get_system_prompt(intent: str = "legal_qa") -> str:
+def get_system_prompt(intent: str = "legal_qa", document_mode: bool = False) -> str:
+    """intent：意图路由结果；document_mode：携带用户文档且提问无法律词（文档分析
+    模式）时返回文档分析专用提示词——优先于意图判断（general 分支也用文档分析
+    prompt，客观总结文档；涉法文档由模型按 prompt 自判后走三段式）。"""
+    if document_mode:
+        return _SYSTEM_PROMPT_DOC_ANALYSIS
     if intent == "greeting":
         return _SYSTEM_PROMPT_GREETING
     if intent == "general_non_legal":

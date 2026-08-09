@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { useSessionsStore } from './sessions'
 
 /** 与旧版一致：trust=可信评估 / articles=法条溯源 / verification=引用核验 */
 export type DetailTab = 'trust' | 'articles' | 'verification'
@@ -47,9 +48,27 @@ export const useDetailPanelStore = defineStore('detailPanel', {
       this.isOpen = true
     },
 
+    /** 清空选中（面板保持打开，显示空态）——切到无法律回答的新会话时防止残留旧会话内容 */
+    clearSelection() {
+      this.selectedMsgId = null
+    },
+
     close() {
       this.isOpen = false
       this.selectedMsgId = null
+    },
+
+    /**
+     * 从收起状态重新展开面板：自动选中最新一条 AI 回答并切到可信分析 tab，
+     * 无需用户再点击会话消息。无回答时保持空态。
+     */
+    openWithLatest() {
+      const sessions = useSessionsStore()
+      const msgs = sessions.currentSession?.messages ?? []
+      const last = [...msgs].reverse().find((m) => m.role === 'assistant')
+      this.isOpen = true
+      this.activeTab = 'trust'
+      this.selectedMsgId = last ? last.id : null
     },
   },
 })

@@ -98,7 +98,7 @@ class AnswerPipeline:
         user_documents = self._truncate_user_documents(user_documents)
 
         intent = (
-            classify_intent(query, history)
+            classify_intent(query, history, user_documents=user_documents)
             if Config.ENABLE_INTENT_ROUTING
             else IntentResult("legal_qa", 1.0, "意图路由已关闭")
         )
@@ -108,6 +108,7 @@ class AnswerPipeline:
                 query=query,
                 intent=intent,
                 history=history,
+                user_documents=user_documents,
                 model_id=model_id,
             )
 
@@ -249,18 +250,35 @@ class AnswerPipeline:
         user_documents = self._truncate_user_documents(user_documents)
 
         intent = (
-            classify_intent(query, history)
+            classify_intent(query, history, user_documents=user_documents)
             if Config.ENABLE_INTENT_ROUTING
             else IntentResult("legal_qa", 1.0, "意图路由已关闭")
         )
 
-        if intent.intent in ("greeting", "general_non_legal"):
+        if intent.intent == "greeting":
+            # 寒暄：不需要文档内容，保持原样（不注入、不用文档分析提示词）
             return PipelineContext(
                 query=query,
                 intent=intent,
                 history=history,
                 use_rag=False,
-                system_prompt=get_system_prompt(intent.intent),
+                system_prompt=get_system_prompt("greeting"),
+                user_documents=user_documents,
+                model_id=model_id,
+            )
+
+        if intent.intent == "general_non_legal":
+            # 非法律文档分析：注入文档全文（此前 context_docs=None 丢弃文档，
+            # 模型读不到——「文档读不到」问题的根源结构），提示词用文档分析版
+            return PipelineContext(
+                query=query,
+                intent=intent,
+                history=history,
+                use_rag=False,
+                system_prompt=get_system_prompt(
+                    "general_non_legal", document_mode=bool(user_documents)
+                ),
+                context_docs=self._build_context_docs(user_documents=user_documents),
                 user_documents=user_documents,
                 model_id=model_id,
             )
@@ -325,7 +343,7 @@ class AnswerPipeline:
             yield from self.model.generate_stream(
                 ctx.query,
                 system_prompt=ctx.system_prompt,
-                context_docs=None,
+                context_docs=ctx.context_docs,
                 history=ctx.history,
                 model_id=ctx.model_id,
             )
@@ -434,13 +452,22 @@ class AnswerPipeline:
         query: str,
         intent: IntentResult,
         history: Optional[List[Dict[str, str]]],
+        user_documents: Optional[List[Dict]] = None,
         model_id: Optional[str] = None,
     ) -> Dict:
-        system_prompt = get_system_prompt(intent.intent)
+        # 非法律文档分析（general + 携带文档）：注入文档全文 + 文档分析提示词；
+        # 寒暄/普通非法律问题不注入文档，保持原样
+        document_mode = intent.intent == "general_non_legal" and bool(user_documents)
+        context_docs = (
+            self._build_context_docs(user_documents=user_documents)
+            if document_mode
+            else None
+        )
+        system_prompt = get_system_prompt(intent.intent, document_mode=document_mode)
         response = self.model.generate(
             query,
             system_prompt=system_prompt,
-            context_docs=None,
+            context_docs=context_docs,
             history=history,
             model_id=model_id,
         )
@@ -465,14 +492,15 @@ class AnswerPipeline:
         history: Optional[List[Dict[str, str]]],
     ) -> Tuple[List[Document], List[float], bool]:
         """Multi-query retrieval with relevance threshold."""
-        best: Dict[Tuple[str, str], Tuple[Document, float]] = {}
         min_rel = Config.RETRIEVAL_MIN_RELEVANCE
+        per_query: List[List[Tuple[Document, float]]] = []
 
         for rq in rewrite.retrieval_queries:
             combined = self._build_retrieval_query(rq, history)
             scored = self.store.similarity_search_unique(
                 combined, k=Config.TOP_K_RETRIEVAL
             )
+            best: Dict[Tuple[str, str], Tuple[Document, float]] = {}
             for doc, distance in scored:
                 if not is_retrieval_relevant(distance, min_rel):
                     continue
@@ -481,14 +509,42 @@ class AnswerPipeline:
                     continue
                 if key not in best or distance < best[key][1]:
                     best[key] = (doc, distance)
+            per_query.append(sorted(best.values(), key=lambda x: x[1]))
 
-        if not best:
+        ranked = self._merge_query_results(per_query, Config.TOP_K_RETRIEVAL)
+        if not ranked:
             return [], [], False
 
-        ranked = sorted(best.values(), key=lambda x: x[1])[: Config.TOP_K_RETRIEVAL]
         docs = [doc for doc, _ in ranked]
         scores = [dist for _, dist in ranked]
         return docs, scores, True
+
+    @staticmethod
+    def _merge_query_results(
+        per_query: List[List[Tuple[Document, float]]],
+        k: int,
+    ) -> List[Tuple[Document, float]]:
+        """多查询结果合并：主查询（用户原话改写）优先，扩展查询按序补位。
+
+        修复（2026-08-09）：「离婚冷静期是多长时间？」经扩展查询
+        「离婚 夫妻共同财产 子女抚养」命中财产分割条款，相关度反而高于用户
+        原话命中的冷静期条款（民法典第1077条），按相关度全局排序会把用户
+        真正关心的条文挤出 top-k，导致模型「检索不到法条依据」。
+        改为逐查询按序取位：主查询结果优先，扩展查询只补剩余空位，
+        并按（法律名, 条号）跨查询去重。
+        """
+        merged: List[Tuple[Document, float]] = []
+        taken = set()
+        for lst in per_query:
+            for doc, distance in lst:
+                key = article_key(doc)
+                if key in taken:
+                    continue
+                taken.add(key)
+                merged.append((doc, distance))
+                if len(merged) >= k:
+                    return merged
+        return merged
 
     @staticmethod
     def _build_context_docs(
