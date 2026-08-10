@@ -206,3 +206,81 @@
 涉及文件：web/frontend/src/views/ChatView.vue, web/frontend/src/components/chat/ChatMessage.vue, src/pipeline/intent_router.py, src/pipeline/answer_pipeline.py, tests/test_intent_router.py, tests/test_retrieval_merge.py（新增）
 验证：pytest 19 例全过（新增关键词 1 例 + 合并策略 4 例）；demo.py 两问题真实生成——「民间借贷利率的合法上限是多少？」：intent=legal_qa、检索到民法典 680/674/670 等借款条款、三段式 + 六维评估 84.1 高可信；「离婚冷静期是多长时间？」：检索第一名即 1077 冷静期条款（66%）、回答「离婚冷静期为30日」+ 三段式 + 六维评估 82.3 高可信；npm run build 零类型错误；重启后端后浏览器回归（非法律提问不再显示「引用核验中…」；Auto 回答角标为星光图标；两个示例问题均三段式）
 --------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+===== 2026-08-10 =====
+类型：新增功能
+内容：智能体功能第一阶段——1) src/config.py 新增智能体配置段：AGENT_ENABLE_TOOLS（工具调用开关，仅 API 引擎生效）、AGENT_MAX_TOOL_ROUNDS（最大工具轮次防死循环）、AGENT_DECISION_MAX_TOKENS（每轮工具决策最大 token）、AGENT_TOOL_ARG_MAX_LEN（工具参数长度上限）；2) src/llm/base.py 新增模型层工具契约：ToolCall（id/name/arguments + to_dict）与 ToolDecision（text + tool_calls 默认空列表）两个 dataclass，BaseLLMModel 追加三个抽象方法 complete_with_tools / complete_stream_with_tools（yield ("text", str) 文本块 + 流末 ("tool_calls", List[ToolCall]) 事件；本地引擎抛 NotImplementedError）与 generate_stream_messages（按原始消息列表流式生成）。本任务仅定义契约，实际逻辑由后续任务实现
+涉及文件：src/config.py, src/llm/base.py, tests/test_model_tool_contract.py（新增）
+验证：pytest tests/test_model_tool_contract.py -q → 3 passed（先确认失败 ImportError 再实现后通过）；全量 pytest tests/ -q → 22 passed 无回归；提交 832a4ae
+
+===== 2026-08-10 =====
+类型：新增功能
+内容：智能体功能第二阶段——任务调度器（src/agents/task_scheduler.py）：把 legal_qa 意图细分为 legal_qa / contract_review / validity_check 三种任务类型，确定性规则分类（不用大模型，快稳便宜可解释），回退安全（规则不命中一律落回 legal_qa，最坏情况=现状不退化）。时效查询法律名动态取自 data/law_registry.json（不硬编码废止清单）；合同审查区分「携带文档+审查信号」（0.85）与「无文档强个人审查意图」（0.8，输出引导上传）。新增 pytest 单测 8 例（tests/test_task_scheduler.py），其中 test_registry_driven_law_names 用临时注册表写入「专利法」验证不硬编码。src/agents/__init__.py 为空文件
+涉及文件：src/agents/__init__.py（新增）, src/agents/task_scheduler.py（新增）, tests/test_task_scheduler.py（新增）
+验证：先确认失败（ModuleNotFoundError: No module named 'src.agents'）再实现；tests/test_task_scheduler.py -q → 8 passed；全量 pytest tests/ -q → 30 passed 无回归；提交 1d1ffb3
+
+===== 2026-08-10 =====
+类型：修复
+内容：任务调度器审查修复（协调者复查反馈 3 项 + 连带 1 项）——1) 无文档合同审查正则收紧：_CONTRACT_REVIEW_NO_DOC_RE 去掉裸「条款」命中（「劳动合同试用期条款违法怎么办？」此前误判合同审查），改为审查动词约束（帮我审/审一下/帮忙审/帮我看看.*合同协议/合同协议.*审查风险把关）；2) 携带文档分支去裸词：_CONTRACT_REVIEW_RE 去掉裸「风险/条款/合规」，要求与合同协议词或审查动词共现（上传判决书问「有什么风险」不再误判）；3) classify_task 入口加强制 intent 守卫（intent.intent != legal_qa → 直接返回 legal_qa，docstring 承诺落地为代码）；4) 连带发现：I3 守卫暴露意图路由漏词——「婚姻法」「专利法」不在 _LEGAL_KEYWORDS，导致「婚姻法现在还有效吗？」被判 general_non_legal、「专利法还有效吗？」被判寒暄（len≤8），时效查询在真实调用链上不可达，intent_router 补「婚姻」「专利」两词根（与表内「继承」「侵权」风格一致）；测试同步追加 3 例保护（I1/I2/I3 各一），既有 8 例与 3 例合同测试全部保持通过
+涉及文件：src/agents/task_scheduler.py, src/pipeline/intent_router.py, tests/test_task_scheduler.py
+验证：追加测试先确认失败（3 failed, 8 passed）再修复；tests/test_task_scheduler.py -q → 11 passed；全量 pytest tests/ -q → 33 passed 无回归（test_intent_router.py 9 例不受影响）；冒烟验证 8 个边界场景全部符合预期；本轮未提交 git（待协调者复查后统一提交）
+
+===== 2026-08-10 =====
+类型：修复
+内容：意图路由补词收尾（协调者复查确认）——上一轮只补「婚姻」「专利」，注册表 9 部废止法律中「收养法」「物权法」仍漏判（「收养法还有效吗？」会被判 general_non_legal、时效查询功能不可达）。_LEGAL_KEYWORDS 追加「收养」「物权」，与「婚姻」「专利」同一注释块（废止法律时效查询场景）。核对 tests/test_intent_router.py 9 例无相关断言、无冲突
+涉及文件：src/pipeline/intent_router.py
+验证：全量 pytest tests/ -q → 33 passed 无回归；冒烟：收养法/物权法/婚姻法时效查询真实链均 intent=legal_qa → validity_check 且 law_name 正确回传；提交 06bc39c（本轮修改日志由 Task 12 统一提交，未纳入该提交）
+
+===== 2026-08-10 =====
+类型：新增功能
+内容：智能体功能 Task 4——合同审查管线 + 文档引文核验。1) 新增 src/citation_verifier/document_quotes.py：DocumentQuoteVerifier 纯字符串逐字比对回答中引用的用户文档原文（「…」/“…”/《…》三种引号样式，文档条款信号词过滤法条名误报），输出 document_quote_checks（text/found/verdict/in_document），防止模型编造合同条款被误当文档事实；2) CitationVerifier.verify 增加 user_documents 参数，报告新增 document_quote_checks 键（无文档时为 None）；3) qwen_model 新增 _SYSTEM_PROMPT_CONTRACT 合同审查专用提示词（【合同风险清单】+【总体评价】结构，要求引号内逐字复述文档原文、仅引用参考法条），get_system_prompt("contract_review") 分支；4) answer_pipeline run() 内三处 verify 调用与 run_verification 一处统一传 user_documents。实测发现（简报之外）：百炼模型引号输出风格为弯引号“…”而非「…」，简报原始引号样式会漏检（真实回答 document_quote_checks 恒为空），已追加弯引号样式 + 单测保护。真实 API 集成验证：上传含试用期/工资/违约金条款的合同 txt → /api/documents/extract → /api/chat 带 user_documents → 回答含【合同风险清单】【总体评价】结构，document_quote_checks 正确核出 3 条文档原文（verified）+ 法条原文等非文档引文（document_mismatch）
+涉及文件：src/citation_verifier/document_quotes.py（新增）, src/citation_verifier/citation_verifier.py, src/llm/qwen_model.py, src/pipeline/answer_pipeline.py, tests/test_document_quotes.py（新增）, tests/test_qwen_prompts.py
+验证：严格 TDD——先写失败测试（ModuleNotFoundError 与断言失败）再实现；tests/test_document_quotes.py + tests/test_qwen_prompts.py → 12 passed；全量 pytest tests/ -q → 54 passed 无回归；真实 API 集成验证通过（任务类型 contract_review、风险清单结构、document_quote_checks 3 verified）；提交见 Task 4 报告
+
+===== 2026-08-10 =====
+类型：新增功能
+内容：智能体功能 Task 5——工具注册表与执行器（src/agents/tools.py）：2 个 function calling 工具 schema（search_articles 检索法条 / check_law_validity 查询时效）+ execute_tool 统一分发入口；参数清洗（去空白、剔控制字符、截断至 AGENT_TOOL_ARG_MAX_LEN=100）；search_articles 走向量检索（相关度阈值过滤 + article_key 去重）；check_law_validity 走 LawValidityService.check_citation；未知工具/空参数返回错误结果不抛异常
+涉及文件：src/agents/tools.py（新增）, tests/test_tools.py（新增）
+验证：严格 TDD——先确认失败（ModuleNotFoundError）再实现；tests/test_tools.py -q → 6 passed；全量 pytest tests/ -q → 39 passed 无回归；提交 0fe6e83（本轮修改日志由 Task 12 统一提交，未纳入该提交）
+
+===== 2026-08-10 =====
+类型：新增功能
+内容：智能体功能 Task 6——模型层工具调用实现：api_client 新增 complete_with_tools（非流式工具决策，temperature 固定 0.0，tool_calls 参数 JSON 解析容错）与 complete_stream_with_tools（流式决策，重试语义与 complete_stream 一致）；qwen_model 新增 supports_tools / complete_with_tools / complete_stream_with_tools（本地引擎抛 NotImplementedError）与 generate_stream_messages（按原始消息列表流式生成）；连带修复 _resolve_model 对 provider=="local" 合成 local ModelSpec（本地分支实际不可达的既有 bug）
+涉及文件：src/llm/api_client.py, src/llm/qwen_model.py, tests/test_model_tools.py（新增）
+验证：严格 TDD——实现前 5 failed 确认失败；实现后 tests/test_model_tools.py + tests/test_qwen_prompts.py → 10 passed；全量 pytest tests/ -q → 44 passed 无回归；提交 7547ce8（本轮修改日志由 Task 12 统一提交，未纳入该提交）
+
+===== 2026-08-10 =====
+类型：新增功能
+内容：智能体功能 Task 7——工具循环引擎：src/agents/trace.py 定义 ToolTraceStep（step/tool_name/arguments/result_summary/success/cost_ms）与 AgentStatusEvent（running/done/error/generating）；src/agents/agent_loop.py 的 AgentToolLoop 实现流式/非流式工具循环（上限 AGENT_MAX_TOOL_ROUNDS=3，每轮决策 token 上限 512）：工具决策轮 yield 状态事件、最终回答轮流式输出；NotImplementedError（本地引擎）自动降级普通生成；轮次耗尽/工具失败兜底不中断、失败步骤记录进轨迹；工具检索结果还原为 Document（元数据含 law_name/article_num/status 等 6 键，供核验合并）；审查修复：降级路径累积 answer（I-1，run() 不再返回空回答）
+涉及文件：src/agents/trace.py（新增）, src/agents/agent_loop.py（新增）, tests/test_agent_loop.py（新增）
+验证：严格 TDD——先确认失败（ModuleNotFoundError）再实现，修正简报 2 处矛盾后 tests/test_agent_loop.py -q → 6 passed；全量 pytest tests/ -q → 60 passed 无回归；提交 68a1fbf（本轮修改日志由 Task 12 统一提交，未纳入该提交）
+
+===== 2026-08-10 =====
+类型：新增功能
+内容：智能体功能 Task 8——流水线与 SSE 集成。1) src/knowledge_base/retrieval_utils.py 新增 merge_unique_docs（工具检索结果按（法律名,条号）去重并入初始检索结果）；2) answer_pipeline.run() 新增 agent_tools 参数：开启且模型支持函数调用且任务为 legal_qa 时走 AgentToolLoop（惰性导入规避循环引用：agent_loop 顶部回引本模块 PipelineContext），返回字典追加 task / tool_trace；3) web/backend/main.py SSE 端点新增智能体分支：meta 之后按 use_agent 判断走 loop.stream，工具状态以 agent_status 事件推送，done 事件追加 task / validity_evidence / tool_trace（工具检索到的法条并入 ctx.retrieved_docs 供后台引用核验使用）；4) schemas.ChatResponse 追加 tool_trace 可选字段（task / validity_evidence 为 Task 3 已有）
+涉及文件：src/pipeline/answer_pipeline.py, src/knowledge_base/retrieval_utils.py, web/backend/main.py, web/backend/schemas.py, tests/test_retrieval_merge.py
+验证：严格 TDD——新用例先确认失败（ImportError）再实现；全量 pytest tests/ -q → 61 passed 无回归；真实 API 集成验证四场景：多法条问题（glm-5.2）触发 9 次 agent_status、tool_trace 非空、三段式回答；普通问题零回归（无 agent_status、tool_trace 空）；时效快路径 meta/done 均带 validity_evidence、回答不套三段式；同步 /api/chat 返回 tool_trace 数组与 task。简报之外发现：默认模型 qwen3.7-plus 在当前 legal_qa 系统提示词下不主动调用工具（模型自主决策，流式/非流式 API 契约经强制指令探测均正常），kimi 轮次耗尽兜底偶发空回答（Task 7 循环逻辑边界）
+
+===== 2026-08-10 =====
+类型：新增功能
+内容：智能体功能 Task 9——前端 SSE agent_status 消费与生成中状态行 + 时效来源标注。1) types.ts 新增 AgentStatusEvent / ToolTraceStep 接口，MessageMeta 追加 task_type / tool_trace / validity_evidence / agent_status（瞬态），DoneEvent / MetaEvent 追加 task_type / validity_evidence / tool_trace，SSEEventMap 追加 agent_status 事件；2) useChatStream 新增 onAgentStatus 回调与事件分发；3) ChatView 接线：onAgentStatus 把最新工具状态写入消息 meta（展开合并），onMeta / onDone 三分支（non_legal / trust / else）/ onFallback 同步降级路径统一落盘 task_type / validity_evidence / tool_trace 并清理瞬态 agent_status；4) ChatMessage 在回答内容上方渲染智能体状态行（● 正在检索法条…→✓ 命中 N 条法条，done 后消失）与时效查询来源标注（◈ 来源：法律时效注册表）。简报之外发现：后端 meta/done/同步响应均只发嵌套 task 对象（task.task_type）而无顶层 task_type 字段，取值处做双源兼容（meta.task_type ?? meta.task?.task_type），保证 meta.task_type 一定落盘（Task 10 依赖）
+涉及文件：web/frontend/src/api/types.ts, web/frontend/src/composables/useChatStream.ts, web/frontend/src/views/ChatView.vue, web/frontend/src/components/chat/ChatMessage.vue
+验证：npm run build vue-tsc 零类型错误；真实 API 三场景（glm-5.2 多法条问题触发 9 次 agent_status + tool_trace 4 步；「你好」无 agent_status；「婚姻法现在还有效吗？」meta/done 均带 validity_evidence）；/ui/ 新产物 200；验证完毕已停服务；提交见 Task 9 报告（本轮修改日志由 Task 12 统一提交，未纳入该提交）
+===== 2026-08-10 =====
+类型：新增功能
+内容：智能体功能 Task 10——工具轨迹面板与文档引文核验展示。1) 新建 web/frontend/src/components/detail/ToolTracePanel.vue：详情面板「工具轨迹」tab 内容，展示每轮工具名/成功失败/参数 JSON/结果摘要/耗时（key 用 step-tool_name，同轮多工具 step 重复为已知设计）；2) DetailBody 接入：tabs 区在有 tool_trace 时条件显示「工具轨迹」tab，内容区顺序改 v-if trust / v-else-if articles / v-else-if trace / v-else verification（verification 保持兜底），detailPanel store 的 DetailTab 类型追加 trace；3) CitationVerificationPanel 展示文档引文核验：types.ts 的 CitationVerification 补 document_quote_checks 类型（text/found/verdict/in_document），「无数据」判断同时考虑 docQuotes，显式引用卡片后追加「文档引文核验」区块（verified → 与上传文档原文一致 / 其他 → 未找到，warning 样式）
+涉及文件：web/frontend/src/components/detail/ToolTracePanel.vue（新增）, web/frontend/src/components/detail/DetailBody.vue, web/frontend/src/components/detail/CitationVerificationPanel.vue, web/frontend/src/api/types.ts, web/frontend/src/stores/detailPanel.ts, web/frontend/dist
+验证：npm run build vue-tsc 零类型错误（首轮 2 错：DetailTab 缺 trace、meta 可能 undefined，已修）；真实 API 三场景——① glm-5.2「工伤认定申请时效和劳动仲裁时效分别是多少？」触发 9 次 agent_status、done.tool_trace 4 步全 success（step 号跨工具重复、args/result_summary/cost_ms 齐全）；② 合同 txt + 「这份合同有什么风险条款？」task=contract_review，document_quote_checks 11 条（verified 原文一致与 document_mismatch 未找到混合，WS 核验路径经 ctx.user_documents 确认同链路）；③ 普通问题 tool_trace 为空 → trace tab 隐藏；/ui/ 新产物 200 且 bundle 含新组件；验证完已停服务；提交 a832200（本轮修改日志由 Task 12 统一提交，未纳入该提交）
+
+===== 2026-08-10 =====
+类型：新增功能
+内容：智能体功能 Task 11——效果对比评测：新增 data/benchmark/agent_compare.json（10 道对比题：7 道带 gold_law/gold_article 法条题 + 3 道时效类题）；run_legal_trust_benchmark.py 新增 --mode agent（pipeline.run 传 agent_tools=True，rows 追加 tool_call_count / elapsed_ms，trust 取值 None 判空保护，summary 追加 avg_tool_calls）；真实对比跑：full avg_trust 83.29 vs agent 83.2、gold_citation_recall 0.7 vs 0.7（零回归）；默认模型 qwen3.7-plus 对 10 道单轮题未触发工具调用（avg_tool_calls=0.0，属预期内的可能结果，如实记录）
+涉及文件：data/benchmark/agent_compare.json（新增）, scripts/run_legal_trust_benchmark.py, data/benchmark/report_full.json, data/benchmark/report_agent.json
+验证：mock 冒烟 --mode agent --mock 报告生成（avg_tool_calls=0.0）；真实模式 full/agent 各 10 题对比跑通过（首跑网络中断重试后成功，validity 题走废止核验路径无崩溃）；pytest tests/ -q → 63 passed 无回归；提交 e33e96e（本轮修改日志由 Task 12 统一提交，未纳入该提交）
+
+===== 2026-08-10 =====
+类型：新增功能
+内容：智能体（Agent）能力落地——任务调度器（合同审查管线输出结构化风险清单 + 文档引文核验；时效查询管线直查注册表出确定性结论）；工具调用引擎（检索法条 / 查询时效 2 个工具，循环上限 3 轮，SSE agent_status 状态事件，前端工具轨迹面板）；effect 对比评测（--mode agent）
+涉及文件：src/agents/（task_scheduler/tools/agent_loop/trace）、src/llm/（base/api_client/qwen_model）、src/pipeline/answer_pipeline.py、src/citation_verifier/（document_quotes + verify 扩展）、web/backend/（main.py/schemas.py）、web/frontend/（types/useChatStream/ChatView/ChatMessage/ToolTracePanel/DetailBody/CitationVerificationPanel）、scripts/run_legal_trust_benchmark.py、data/benchmark/agent_compare.json
+验证：pytest 全绿；npm run build 零类型错误；三类问题（多法条/合同/时效）真实 API 集成验证通过；对比报告产出
