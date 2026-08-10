@@ -8,6 +8,14 @@ export function login(username: string, password: string) {
   })
 }
 
+/** 注册新用户：成功即自动登录（后端直接返回 token） */
+export function register(username: string, password: string) {
+  return request<LoginResponse>('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ username, password }),
+  })
+}
+
 export function verifyToken(token: string) {
   return request<VerifyResponse>('/api/auth/verify', {
     method: 'POST',

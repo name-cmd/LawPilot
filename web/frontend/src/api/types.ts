@@ -72,6 +72,26 @@ export interface ChatRequest {
   model?: string
   /** 设置面板保存的全局默认模型 id（Auto 解析用，以后端为准） */
   global_model?: string
+  /** 登录 Token（可选）：带有效 Token 时该账号自配了 API Key 则使用自己的 Key */
+  token?: string
+}
+
+// ── 多用户账号（阶段三：服务端会话管理）──────────────────
+export interface UserDataResponse {
+  /** 服务端保存的不透明 JSON（结构与本地 store 一致），赋值时按 store 类型收窄 */
+  sessions: any[]
+  favorites: any[]
+  /** 服务端是否已有该用户的数据文件（false = 首次登录，本地数据优先并回写） */
+  exists: boolean
+}
+
+export interface UserProfile {
+  display_name: string
+  bio: string
+  avatar_color: string
+  avatar_data: string | null
+  /** 用户自配百炼 API Key（null = 回退服务端 .env Key） */
+  api_key?: string | null
 }
 
 // ── 模型目录（/api/models）──────────────────────────────

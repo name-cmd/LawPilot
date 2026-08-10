@@ -243,6 +243,8 @@ export const useSessionsStore = defineStore('sessions', {
         model: settings.modelProvider === 'local' ? 'local' : settings.apiModel,
         // 设置面板的全局默认模型（Auto 跟随；后端解析为准）
         global_model: settings.globalDefaultModel,
+        // 登录 Token：后端凭它解析该账号自配的 API Key（未登录不发）
+        token: useAuthStore().token || undefined,
         user_documents: this.pendingAttachments
           .filter((a) => !a.uploading && a.text)
           .map((a) => ({

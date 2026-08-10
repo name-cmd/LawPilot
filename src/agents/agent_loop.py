@@ -150,6 +150,7 @@ class AgentToolLoop:
                 for kind, payload in self.model.complete_stream_with_tools(
                     messages, TOOLS, model_id=model_id,
                     max_tokens=Config.AGENT_DECISION_MAX_TOKENS,
+                    api_key=ctx.api_key,  # 每用户 Key 透传：工具决策沿用用户 Key
                 ):
                     if kind == "text":
                         self.answer += payload
@@ -158,7 +159,9 @@ class AgentToolLoop:
                         tool_calls = payload
             except NotImplementedError:
                 # 本地引擎不支持函数调用：退回普通生成（等于现状）
-                for chunk in self.model.generate_stream_messages(messages, model_id=model_id):
+                for chunk in self.model.generate_stream_messages(
+                    messages, model_id=model_id, api_key=ctx.api_key
+                ):
                     self.answer += chunk
                     yield chunk
                 return
@@ -186,7 +189,9 @@ class AgentToolLoop:
             detail=f"已到达工具调用轮次上限（{self.max_rounds} 轮），综合生成最终回答…",
         )
         before = len(self.answer)
-        for chunk in self.model.generate_stream_messages(messages, model_id=model_id):
+        for chunk in self.model.generate_stream_messages(
+            messages, model_id=model_id, api_key=ctx.api_key
+        ):
             self.answer += chunk
             yield chunk
         if len(self.answer) == before:
@@ -199,6 +204,7 @@ class AgentToolLoop:
                 history=ctx.history,
                 intent_hint=ctx.intent_hint,
                 model_id=model_id,
+                api_key=ctx.api_key,
             )
             if text:
                 self.answer += text

@@ -62,11 +62,15 @@ src/
   document_processing/           # 用户文档解析（txt/docx/pdf/OCR）
   llm/                           # Qwen 模型
 web/
-  backend/main.py                # FastAPI
-  frontend/index.html            # Vue3 演示页
+  backend/main.py                # FastAPI（auth/register/chat/user 数据接口）
+  backend/user_store.py          # 用户注册表（哈希密码 + 每用户 API Key）
+  backend/session_manager.py     # 服务端会话（Token TTL + JSON 持久化）
+  backend/user_data.py           # 每用户数据（会话/收藏/资料）JSON 读写
+  frontend/src/                  # Vite + Vue3 + TS 单页前端
 data/
   raw/                           # 12 部法律 Markdown
   benchmark/                     # LegalTrustBench
+  users/                         # 多用户数据（注册表/Token/会话收藏，不入库）
 docs/competition/                # 竞赛材料
 TrustLLM/                        # TrustLLM 参考实现（独立子项目）
 ```

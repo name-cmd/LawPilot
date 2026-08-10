@@ -71,7 +71,7 @@ const userOptions = computed(() => [
   { label: '退出登录', key: 'logout', icon: menuIcon(LogOutOutline) },
 ])
 
-function onUserSelect(key: string) {
+async function onUserSelect(key: string) {
   if (key === 'settings') {
     showSettings.value = true
   } else if (key === 'profile') {
@@ -87,9 +87,10 @@ function onUserSelect(key: string) {
       onPositiveClick: () => sessions.clearAllSessions(),
     })
   } else if (key === 'logout') {
-    // 清理会话数据（按用户隔离的持久化 key 会在下次登录重新加载）
-    sessions.$reset()
-    auth.logout()
+    // 登出只清登录态，不碰会话数据（数据在服务端，重新登录自动恢复）。
+    // 注意必须 await：auth.logout() 先调后端吊销 Token 再清本地登录态，
+    // 若不等它完成就跳转，路由守卫仍视为「已登录」而弹回聊天页（旧版点两次的 bug）。
+    await auth.logout()
     router.push('/login')
   }
 }

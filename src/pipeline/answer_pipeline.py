@@ -72,6 +72,9 @@ class PipelineContext:
     user_documents: Optional[List[Dict]] = None
     # 用户选择的模型 id（"auto" 已在路由层解析为具体 id；None = 走引擎默认）
     model_id: Optional[str] = None
+    # 用户自配 API Key（None = 回退服务端 .env Key）；随 ctx 传递，
+    # agent_loop / 流式生成 / 异步核验任务均可直接读取，全程同一个 Key
+    api_key: Optional[str] = None
     # 任务调度结果（合同审查 / 时效查询 / 默认法律问答）
     task: Optional[TaskDecision] = None
     # 时效查询的确定性证据（任务类型为 validity_check 时非空）
@@ -107,6 +110,7 @@ class AnswerPipeline:
         user_documents: Optional[List[Dict]] = None,
         model_id: Optional[str] = None,
         agent_tools: bool = False,
+        api_key: Optional[str] = None,
     ) -> Dict:
         max_regeneration = (
             max_regeneration
@@ -128,6 +132,7 @@ class AnswerPipeline:
                 history=history,
                 user_documents=user_documents,
                 model_id=model_id,
+                api_key=api_key,
             )
 
         task = classify_task(query, intent, user_documents)
@@ -137,7 +142,7 @@ class AnswerPipeline:
             return self._run_contract_guidance(query, intent, task, history, model_id)
 
         if task.task_type == "validity_check":
-            return self._run_validity(query, intent, task, history, model_id)
+            return self._run_validity(query, intent, task, history, model_id, api_key=api_key)
 
         rewrite = (
             rewrite_for_retrieval(query)
@@ -205,6 +210,7 @@ class AnswerPipeline:
                 history=history,
                 user_documents=user_documents,
                 model_id=model_id,
+                api_key=api_key,
             )
             response, trace_steps = loop.run(temp_ctx, model_id=model_id)
             tool_trace = [s.to_dict() for s in trace_steps]
@@ -219,6 +225,7 @@ class AnswerPipeline:
                 history=history,
                 intent_hint=intent_hint,
                 model_id=model_id,
+                api_key=api_key,
             )
 
         verification = (
@@ -249,6 +256,7 @@ class AnswerPipeline:
                 history=history,
                 intent_hint=intent_hint,
                 model_id=model_id,
+                api_key=api_key,
             )
             verification = self.verifier.verify(
                 response,
@@ -268,6 +276,7 @@ class AnswerPipeline:
                 history=history,
                 intent_hint=intent_hint,
                 model_id=model_id,
+                api_key=api_key,
             )
             verification = self.verifier.verify(
                 response,
@@ -284,6 +293,7 @@ class AnswerPipeline:
                 context_docs=context_docs,
                 history=history,
                 model_id=model_id,
+                api_key=api_key,
             )
 
         trust_report = None
@@ -320,6 +330,7 @@ class AnswerPipeline:
         history: Optional[List[Dict[str, str]]] = None,
         user_documents: Optional[List[Dict]] = None,
         model_id: Optional[str] = None,
+        api_key: Optional[str] = None,
     ) -> PipelineContext:
         user_documents = self._truncate_user_documents(user_documents)
 
@@ -339,6 +350,7 @@ class AnswerPipeline:
                 system_prompt=get_system_prompt("greeting"),
                 user_documents=user_documents,
                 model_id=model_id,
+                api_key=api_key,
             )
 
         if intent.intent == "general_non_legal":
@@ -355,6 +367,7 @@ class AnswerPipeline:
                 context_docs=self._build_context_docs(user_documents=user_documents),
                 user_documents=user_documents,
                 model_id=model_id,
+                api_key=api_key,
             )
 
         task = classify_task(query, intent, user_documents)
@@ -372,6 +385,7 @@ class AnswerPipeline:
                 short_circuit_text=_CONTRACT_GUIDANCE_MESSAGE,
                 user_documents=user_documents,
                 model_id=model_id,
+                api_key=api_key,
             )
 
         # 时效查询快路径：直查注册表 → 确定性证据 + 模型润色（不检索、不核验）
@@ -390,6 +404,7 @@ class AnswerPipeline:
                 validity_evidence=evidence,
                 user_documents=user_documents,
                 model_id=model_id,
+                api_key=api_key,
             )
 
         rewrite = (
@@ -446,6 +461,7 @@ class AnswerPipeline:
             history=history,
             user_documents=user_documents,
             model_id=model_id,
+            api_key=api_key,
         )
 
     def generate_answer_stream(
@@ -463,6 +479,7 @@ class AnswerPipeline:
                 context_docs=ctx.context_docs,
                 history=ctx.history,
                 model_id=ctx.model_id,
+                api_key=ctx.api_key,
             )
             return
 
@@ -473,6 +490,7 @@ class AnswerPipeline:
             history=ctx.history,
             intent_hint=ctx.intent_hint,
             model_id=ctx.model_id,
+            api_key=ctx.api_key,
         )
 
     def run_fast(
@@ -482,6 +500,7 @@ class AnswerPipeline:
         history: Optional[List[Dict[str, str]]] = None,
         user_documents: Optional[List[Dict]] = None,
         model_id: Optional[str] = None,
+        api_key: Optional[str] = None,
     ) -> Tuple[PipelineContext, Optional[Dict]]:
         """Prepare context and metadata without LLM generation or verification."""
         ctx = self.prepare_context(
@@ -490,6 +509,7 @@ class AnswerPipeline:
             history=history,
             user_documents=user_documents,
             model_id=model_id,
+            api_key=api_key,
         )
 
         if ctx.intent.intent in ("greeting", "general_non_legal"):
@@ -519,8 +539,12 @@ class AnswerPipeline:
         response: str,
         enable_consistency: bool = False,
         n_consistency_samples: int = 2,
+        api_key: Optional[str] = None,
     ) -> Dict:
-        """Full citation verification and trust scoring (no regeneration)."""
+        """Full citation verification and trust scoring (no regeneration).
+
+        api_key 缺省时沿用 ctx.api_key（异步核验任务从 ctx 携带用户 Key）。
+        """
         if ctx.intent.intent in ("greeting", "general_non_legal"):
             return {
                 "citation_verification": dict(_EMPTY_VERIFICATION),
@@ -549,6 +573,7 @@ class AnswerPipeline:
                 context_docs=ctx.context_docs,
                 history=ctx.history,
                 model_id=ctx.model_id,
+                api_key=api_key if api_key is not None else ctx.api_key,
             )
 
         trust_report = None
@@ -577,6 +602,7 @@ class AnswerPipeline:
         history: Optional[List[Dict[str, str]]],
         user_documents: Optional[List[Dict]] = None,
         model_id: Optional[str] = None,
+        api_key: Optional[str] = None,
     ) -> Dict:
         # 非法律文档分析（general + 携带文档）：注入文档全文 + 文档分析提示词；
         # 寒暄/普通非法律问题不注入文档，保持原样
@@ -593,6 +619,7 @@ class AnswerPipeline:
             context_docs=context_docs,
             history=history,
             model_id=model_id,
+            api_key=api_key,
         )
         trust_report = None
         return {
@@ -640,6 +667,7 @@ class AnswerPipeline:
         task: TaskDecision,
         history: Optional[List[Dict[str, str]]] = None,
         model_id: Optional[str] = None,
+        api_key: Optional[str] = None,
     ) -> Dict:
         validity = self.verifier.validity if self.verifier else LawValidityService()
         evidence = build_validity_evidence(task.law_name, validity)
@@ -649,6 +677,7 @@ class AnswerPipeline:
             context_docs=[evidence["text"]],
             history=history,
             model_id=model_id,
+            api_key=api_key,
         )
         return {
             "query": query,

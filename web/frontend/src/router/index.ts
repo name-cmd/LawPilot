@@ -4,6 +4,7 @@ import ChatView from '@/views/ChatView.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSessionsStore } from '@/stores/sessions'
 import { useFavoritesStore } from '@/stores/favorites'
+import { useSync } from '@/composables/useSync'
 
 /**
  * 路由表。
@@ -34,6 +35,8 @@ router.beforeEach(async (to) => {
     if (ok) {
       await sessions.loadForCurrentUser()
       favorites.loadForCurrentUser()
+      // 刷新页面时也从服务端拉取一次：换设备/清缓存后在此恢复（失败静默降级本地）
+      useSync().pull()
     } else {
       await auth.logout()
     }

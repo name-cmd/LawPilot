@@ -113,3 +113,9 @@ class Config:
 
     # NLI model (downloaded from HuggingFace at runtime)
     NLI_MODEL_NAME = str(BASE_DIR / "models" / "Erlangshen-Roberta-330M-NLI")
+
+    # ---- 多用户账号体系（阶段三：服务端会话管理）----
+    # Token 有效期（秒）：24 小时，每次校验通过自动续期（滑动过期）
+    SESSION_TTL_SEC = 86400
+    # 用户注册表 / Token 表 / 每用户数据 JSON 的存放目录（不入库，见 .gitignore）
+    USER_DATA_DIR = str(BASE_DIR / "data" / "users")

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { AUTH_KEY_V1, AUTH_KEY_V2, PROFILE_PREFIX_V1, migrateJson } from '@/utils/storage'
-import { login as apiLogin, logout as apiLogout, verifyToken } from '@/api/auth'
+import { login as apiLogin, logout as apiLogout, register as apiRegister, verifyToken } from '@/api/auth'
 import type { LoginResponse } from '@/api/types'
 
 export interface UserProfile {
@@ -58,6 +58,13 @@ export const useAuthStore = defineStore('auth', {
 
     async login(username: string, password: string) {
       const data = await apiLogin(username, password)
+      this.setSession(data)
+      this.loadProfileV1()
+    },
+
+    /** 注册新用户：成功即已登录（后端直接返回 token） */
+    async register(username: string, password: string) {
+      const data = await apiRegister(username, password)
       this.setSession(data)
       this.loadProfileV1()
     },

@@ -115,13 +115,16 @@ autodl-tmp/                          # 项目根目录
 │       └── logits_entropy.py        # 熵相关工具
 ├── web/
 │   ├── backend/
-│   │   ├── main.py                  # FastAPI 路由（auth/chat/stream/documents/ws）
+│   │   ├── main.py                  # FastAPI 路由（auth/register/chat/stream/user 数据/ws）
 │   │   ├── schemas.py               # 请求/响应模型
+│   │   ├── user_store.py            # 用户注册表（pbkdf2 哈希密码 + 每用户 API Key）
+│   │   ├── session_manager.py       # 服务端会话管理（Token 24h TTL + JSON 持久化）
+│   │   ├── user_data.py             # 每用户数据（会话/收藏/资料）JSON 读写
 │   │   ├── verification_worker.py   # 后台异步核验任务
 │   │   ├── ws_manager.py            # WebSocket 连接管理
 │   │   └── task_registry.py         # 核验任务状态注册
 │   └── frontend/
-│       └── index.html               # Web 演示页（登录、对话、详情、用户中心）
+│       └── src/                     # Vite + Vue3 + TS 单页前端（登录/注册、对话、详情、用户中心）
 ├── scripts/                         # 运维与演示脚本
 │   ├── run_server.py                # 启动 Web 服务（端口 6006）
 │   ├── demo.py                      # 命令行问答
@@ -135,7 +138,8 @@ autodl-tmp/                          # 项目根目录
 │   ├── raw/                         # 6 部现行法律 Markdown 原文
 │   ├── processed/                   # 结构化 JSON + law_repeals.json
 │   ├── law_registry.json            # 废止法律注册表
-│   └── benchmark/                   # LegalTrustBench 测试集
+│   ├── benchmark/                   # LegalTrustBench 测试集
+│   └── users/                       # 多用户数据（注册表/Token 表/每用户会话收藏，不入库）
 ├── models/                          # 本地模型权重目录
 ├── law_db/                          # ChromaDB 持久化数据
 ├── docs/                            # 文档与竞赛材料

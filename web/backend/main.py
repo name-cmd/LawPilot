@@ -34,8 +34,6 @@ from src.trust_eval.legal_trust_scorer import LegalTrustScorer
 from src.guardrails.input_guard import InputGuard
 from src.guardrails.session_title import generate_session_title
 
-import secrets
-
 from web.backend.schemas import (
     AuthVerifyRequest,
     AuthVerifyResponse,
@@ -48,17 +46,28 @@ from web.backend.schemas import (
     HealthResponse,
     LoginRequest,
     LoginResponse,
+    RegisterRequest,
     SessionTitleRequest,
     SessionTitleResponse,
+    UserDataFetchRequest,
+    UserDataResponse,
+    UserDataSaveRequest,
+    UserProfileResponse,
+    UserProfileUpdateRequest,
 )
 from src.document_processing import DocumentExtractor
 from web.backend.task_registry import TaskStatus, get_task_registry
+from web.backend.user_data import UserDataStore
+from web.backend.user_store import UserStore
+from web.backend.session_manager import SessionManager
 from web.backend.ws_manager import get_ws_manager
 from web.backend.verification_worker import bind_main_loop, run_verification_task
 
-# 测试阶段固定账号（生产环境应改为数据库 + 哈希密码）
-_AUTH_USERS = {"root": "123456"}
-_active_tokens: dict[str, str] = {}  # token -> username
+# 多用户账号体系（阶段三）：用户注册表（哈希密码 + 每用户 API Key）、
+# 服务端会话管理（Token TTL + JSON 持久化）、每用户数据（会话/收藏/资料）
+_user_store = UserStore()
+_session_mgr = SessionManager()
+_user_data = UserDataStore()
 
 _pipeline: Optional[AnswerPipeline] = None
 _store: Optional[LawVectorStore] = None
@@ -208,32 +217,122 @@ if FIGURE_DIR.exists():
     app.mount("/figure", StaticFiles(directory=str(FIGURE_DIR)), name="figure")
 
 
-@app.post("/api/auth/login", response_model=LoginResponse)
-def login(req: LoginRequest):
-    expected = _AUTH_USERS.get(req.username)
-    if expected is None or expected != req.password:
-        raise HTTPException(status_code=401, detail="用户名或密码错误")
-    token = secrets.token_urlsafe(32)
-    _active_tokens[token] = req.username
+@app.post("/api/auth/register", response_model=LoginResponse)
+def register(req: RegisterRequest):
+    """注册新用户：成功即自动登录（直接返回 token）。"""
+    from web.backend.user_store import UsernameTakenError
+
+    try:
+        user = _user_store.register(req.username, req.password)
+    except UsernameTakenError as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    token = _session_mgr.create(user.username)
     return LoginResponse(
         token=token,
-        username=req.username,
-        display_name=req.username,
+        username=user.username,
+        display_name=user.display_name,
+    )
+
+
+@app.post("/api/auth/login", response_model=LoginResponse)
+def login(req: LoginRequest):
+    user = _user_store.authenticate(req.username, req.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="用户名或密码错误")
+    token = _session_mgr.create(user.username)
+    return LoginResponse(
+        token=token,
+        username=user.username,
+        display_name=user.display_name,
     )
 
 
 @app.post("/api/auth/verify", response_model=AuthVerifyResponse)
 def verify_auth(req: AuthVerifyRequest):
-    username = _active_tokens.get(req.token)
+    username = _session_mgr.verify(req.token)
     if not username:
         return AuthVerifyResponse(valid=False)
-    return AuthVerifyResponse(valid=True, username=username, display_name=username)
+    return AuthVerifyResponse(
+        valid=True,
+        username=username,
+        display_name=_user_store.display_name(username),
+    )
 
 
 @app.post("/api/auth/logout")
 def logout(req: AuthVerifyRequest):
-    _active_tokens.pop(req.token, None)
+    _session_mgr.revoke(req.token)
     return {"ok": True}
+
+
+def _require_user(req: AuthVerifyRequest) -> str:
+    """校验 Token，返回用户名；无效抛 401。"""
+    username = _session_mgr.verify(req.token)
+    if not username:
+        raise HTTPException(status_code=401, detail="登录已过期，请重新登录")
+    return username
+
+
+# ---- 用户数据读写（阶段三 3.2：登录后拉取恢复，双写异步提交）----
+
+
+@app.post("/api/user/data", response_model=UserDataResponse)
+def fetch_user_data(req: UserDataFetchRequest):
+    """拉取该用户全部会话与收藏（exists=false 表示服务端无数据文件=首次登录）。"""
+    username = _require_user(req)
+    data = _user_data.load(username)
+    return UserDataResponse(
+        sessions=data["sessions"],
+        favorites=data["favorites"],
+        exists=data["exists"],
+    )
+
+
+@app.post("/api/user/data/save")
+def save_user_data(req: UserDataSaveRequest):
+    """整包保存会话与收藏（前端双写防抖提交）。"""
+    username = _require_user(req)
+    _user_data.save_data(username, req.sessions, req.favorites)
+    return {"ok": True}
+
+
+@app.post("/api/user/profile", response_model=UserProfileResponse)
+def fetch_user_profile(req: UserDataFetchRequest):
+    username = _require_user(req)
+    return UserProfileResponse(**_user_data.get_profile(username))
+
+
+@app.post("/api/user/profile/save", response_model=UserProfileResponse)
+def save_user_profile(req: UserProfileUpdateRequest):
+    username = _require_user(req)
+    patch = {
+        k: getattr(req, k)
+        for k in ("display_name", "bio", "avatar_color", "avatar_data", "api_key")
+        if getattr(req, k) is not None
+    }
+    # 用户自配 API Key 同步写入注册表（问答时从注册表取 Key，数据文件不重复存）
+    if "api_key" in patch:
+        _user_store.update_api_key(username, patch["api_key"])
+        # 归一化（空串 → None 表示未配置）：save_profile 会跳过 None 字段，
+        # 清空场景需存空串显式覆盖旧值，保证资料文件与注册表一致
+        user = _user_store.get_user(username)
+        patch["api_key"] = (user.api_key if user else None) or ""
+    return UserProfileResponse(**_user_data.save_profile(username, patch))
+
+
+def _resolve_user_api_key(req_token: Optional[str]) -> Optional[str]:
+    """请求带有效登录 Token → 返回该用户自配 API Key；未登录/未配置 → None
+    （None 表示回退服务端 .env 的 DASHSCOPE_API_KEY，root 默认即此路径）。
+    Token 无效不强制鉴权（指南阶段三 3.4 预留能力），仅回退服务端 Key。"""
+    if not req_token:
+        return None
+    username = _session_mgr.verify(req_token)
+    if not username:
+        return None
+    user = _user_store.get_user(username)
+    return user.api_key if user else None
 
 
 @app.get("/api/health", response_model=HealthResponse)
@@ -354,6 +453,7 @@ def chat(req: ChatRequest):
             detail="服务未就绪：请确认向量库已构建且模型路径正确",
         )
     spec = _resolve_model(req.model, req.global_model)
+    user_api_key = _resolve_user_api_key(req.token)
     try:
         history = [{"role": m.role, "content": m.content} for m in req.history]
         result = _pipeline.run(
@@ -365,6 +465,7 @@ def chat(req: ChatRequest):
             history=history or None,
             user_documents=_serialize_user_documents(req.user_documents),
             model_id=spec.id,
+            api_key=user_api_key,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -412,6 +513,7 @@ def chat_stream(req: ChatStreamRequest, background_tasks: BackgroundTasks):
         )
 
     spec = _resolve_model(req.model, req.global_model)
+    user_api_key = _resolve_user_api_key(req.token)
     history = [{"role": m.role, "content": m.content} for m in req.history]
     message_id = req.message_id
     get_task_registry().create(message_id)
@@ -424,6 +526,7 @@ def chat_stream(req: ChatStreamRequest, background_tasks: BackgroundTasks):
                 history=history or None,
                 user_documents=_serialize_user_documents(req.user_documents),
                 model_id=spec.id,
+                api_key=user_api_key,
             )
 
             # 首事件必发 meta：携带实际使用的模型（流式中断时消息也有模型记录），

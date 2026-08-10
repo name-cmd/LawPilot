@@ -65,6 +65,9 @@ class ChatRequest(BaseModel):
     model: Optional[str] = None
     # 前端设置面板保存的全局默认模型 id（Auto 解析用，最终以后端为准）
     global_model: Optional[str] = None
+    # 登录 Token（可选）：带有效 Token 时该账号若自配了 API Key 则使用用户自己的 Key，
+    # 否则回退服务端 .env Key。不强制鉴权（指南阶段三 3.4 预留能力）
+    token: Optional[str] = None
 
 
 class ChatStreamRequest(ChatRequest):
@@ -107,6 +110,11 @@ class LoginRequest(BaseModel):
     password: str = Field(..., min_length=1, max_length=128)
 
 
+class RegisterRequest(BaseModel):
+    username: str = Field(..., min_length=1, max_length=64)
+    password: str = Field(..., min_length=1, max_length=128)
+
+
 class LoginResponse(BaseModel):
     token: str
     username: str
@@ -121,3 +129,39 @@ class AuthVerifyResponse(BaseModel):
     valid: bool
     username: Optional[str] = None
     display_name: Optional[str] = None
+
+
+# ---- 用户数据读写（阶段三 3.2：会话/收藏整包同步 + 资料独立保存）----
+class UserDataFetchRequest(BaseModel):
+    token: str = Field(..., min_length=1)
+
+
+class UserDataSaveRequest(BaseModel):
+    token: str = Field(..., min_length=1)
+    sessions: List[Dict[str, Any]] = Field(default_factory=list)
+    favorites: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class UserDataResponse(BaseModel):
+    sessions: List[Dict[str, Any]] = Field(default_factory=list)
+    favorites: List[Dict[str, Any]] = Field(default_factory=list)
+    # 服务端是否已有该用户的数据文件（false = 首次登录，前端应以本地数据为准并回写）
+    exists: bool = False
+
+
+class UserProfileResponse(BaseModel):
+    display_name: str = ""
+    bio: str = ""
+    avatar_color: str = ""
+    avatar_data: Optional[str] = None
+    # 用户自配百炼 API Key（仅自己可见；null = 回退服务端 .env Key）
+    api_key: Optional[str] = None
+
+
+class UserProfileUpdateRequest(BaseModel):
+    token: str = Field(..., min_length=1)
+    display_name: Optional[str] = None
+    bio: Optional[str] = None
+    avatar_color: Optional[str] = None
+    avatar_data: Optional[str] = None
+    api_key: Optional[str] = None

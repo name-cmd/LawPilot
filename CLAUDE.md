@@ -66,7 +66,7 @@ python scripts/run_legal_trust_benchmark.py --mode full --mock   # 离线基准�
 | 〇 | 基础修复（法律名识别、pyproject 化、sys.path 清理） | 未开始 |
 | 一 | 流式输出优化（降级重试、资源释放、打字动画） | 未开始 |
 | 二 | 问答缓存层（L1 精确 / L2 语义 / L3 嵌入） | 未开始 |
-| 三 | 服务端会话管理（JSON 持久化 + Token TTL） | 未开始 |
+| 三 | 服务端会话管理（JSON 持久化 + Token TTL） | 已完成（含扩展：注册/登录 + 每用户数据 + 每用户 API Key，见下方「其他约定」） |
 | 四 | 效果对比框架（数据证明方案效果） | 未开始 |
 | 五 | LangSmith 集成（行为追踪与 Token 统计） | 未开始 |
 | 六 | 多用户并发 | 未开始 |
@@ -90,7 +90,15 @@ python scripts/run_legal_trust_benchmark.py --mode full --mock   # 离线基准�
 
 ## 其他约定
 
-- 配置中心：`src/config.py`（检索相关度阈值默认 0.35、可信权重、RAG/自一致性开关、LLM_PROVIDER 双模式切换等），改配置优先改这里。
+- 多用户账号体系（阶段三，已完成）：账号数据（会话/收藏/资料/自配 API Key）存服务端
+  `data/users/` 下 JSON 文件（不入库），Token 24h 滑动过期、多端共存、重启恢复；
+  密码 pbkdf2 哈希。种子账号 root/user1/user2（密码均 123456），登录页可注册新账号
+  （用户名+密码）。每账号可自配百炼 API Key：请求带 token 时后端解析用户 Key 并沿
+  pipeline → model → api_client 透传（未配置回退服务端 .env Key，root 默认）。前端
+  双写同步在 `web/frontend/src/composables/useSync.ts`（登录拉取恢复 + 3 秒防抖整包
+  提交），聊天请求体 `token` 字段由 `stores/sessions.ts buildChatPayload` 注入。
+  用户注册表/会话管理/用户数据模块：`web/backend/{user_store,session_manager,user_data}.py`。
+- 配置中心：`src/config.py`（检索相关度阈值默认 0.35、可信权重、RAG/自一致性开关、LLM_PROVIDER 双模式切换、SESSION_TTL_SEC 等），改配置优先改这里。
 - 多模型引擎（阶段八）：模型目录统一在 `src/llm/model_registry.py`（7 个模型，全部托管阿里云百炼、共用 `DASHSCOPE_API_KEY`；**新增模型 = 注册表加一行**，前端选择器自动出现）。前端发送框旁模型选择器：离线调用 / API 调用两级，API 下可选 Auto（跟随设置面板的全局默认模型，默认 qwen3.7-plus，`.env` 的 `DEFAULT_API_MODEL` 兜底）或具体模型；离线引擎需 CUDA GPU + 模型文件，未就绪自动置灰。模型选择按请求透传（`model_id` 参数沿 main.py → pipeline → model.generate → api_client 传递，并发不串模型），自一致性核验自动沿用所选模型。LLM 双模式仍保留：`LLM_PROVIDER="api"`（默认）走百炼；`"local"` 走本地 Qwen2.5-7B（fp16 约 14GB 显存，需 CUDA GPU）。API 模式下全项目仅需 bge/NLI 两个小模型，CPU 即可运行，无需 GPU。Web 端离线调用暂缓（选中即提示暂未启用），本地引擎仅 CLI demo.py 支持。
 - 运行依赖 GPU（仅本地模式）：Qwen2.5-7B 本地推理（fp16 约 14GB 显存），无 CUDA 时请使用 API 模式。
 - 数据流链路：`data/raw` → `convert_md_to_json` → `data/processed` → `build_knowledge_base` → `law_db`。

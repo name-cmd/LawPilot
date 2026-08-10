@@ -6,7 +6,7 @@
 阶段八改造：模型选择按请求透传（model_id 参数），由模型注册表解析；
 不再依赖实例级 provider 字段决定单次请求用哪个模型。
 """
-from typing import Dict, Generator, List, Optional
+from typing import Dict, Generator, List, Optional, Tuple
 import threading
 
 import torch
@@ -136,8 +136,8 @@ class QwenModel(BaseLLMModel):
         self._tokenizer: Optional[AutoTokenizer] = None
         # API 模式：key 缺失会在构造时抛中文 RuntimeError（服务端 lifespan 已兜底降级）
         self._api = api_client or (APIClient() if self.provider == "api" else None)
-        # 按 base_url 缓存的 API 客户端（多供应商预留；本期全部为百炼同一客户端）
-        self._api_clients: Dict[str, APIClient] = {}
+        # 按 (base_url, api_key) 缓存的 API 客户端（多供应商 + 多用户 Key 预留）
+        self._api_clients: Dict[Tuple[str, Optional[str]], APIClient] = {}
 
     # ------------------------------------------------------------------
     # 模型解析
@@ -167,14 +167,20 @@ class QwenModel(BaseLLMModel):
             )
         return resolve_model_spec(mid)
 
-    def _get_api_client(self, spec: ModelSpec) -> APIClient:
-        """按 base_url 获取/创建 API 客户端（Key 统一从 spec.key_env 环境变量读取）。"""
-        if spec.base_url not in self._api_clients:
-            self._api_clients[spec.base_url] = APIClient(
+    def _get_api_client(self, spec: ModelSpec, api_key: Optional[str] = None) -> APIClient:
+        """按 (base_url, api_key) 获取/创建 API 客户端。
+
+        api_key=None 时 APIClient 内部回退服务端环境变量（.env 的 DASHSCOPE_API_KEY）；
+        用户自配 Key 时按 Key 独立缓存，并发请求不串 Key（与 model_id 同语义）。
+        """
+        key = (spec.base_url, api_key)
+        if key not in self._api_clients:
+            self._api_clients[key] = APIClient(
                 base_url=spec.base_url,
+                api_key=api_key,
                 provider_label="百炼" if spec.provider == "dashscope" else spec.provider,
             )
-        return self._api_clients[spec.base_url]
+        return self._api_clients[key]
 
     # ------------------------------------------------------------------
     # BaseLLMModel 契约
@@ -294,6 +300,7 @@ class QwenModel(BaseLLMModel):
         history: Optional[List[Dict[str, str]]] = None,
         intent_hint: Optional[str] = None,
         model_id: Optional[str] = None,
+        api_key: Optional[str] = None,
     ) -> str:
         system_prompt = system_prompt or _SYSTEM_PROMPT
         temperature = temperature if temperature is not None else Config.LLM_TEMPERATURE
@@ -307,7 +314,7 @@ class QwenModel(BaseLLMModel):
 
         # ---- API 分支：多模型 OpenAI 兼容接口（按注册表路由） ----
         if spec.provider != "local":
-            return self._get_api_client(spec).complete(
+            return self._get_api_client(spec, api_key).complete(
                 messages, model_id=spec.id, temperature=temperature, max_tokens=max_new_tokens
             )
 
@@ -339,6 +346,7 @@ class QwenModel(BaseLLMModel):
         history: Optional[List[Dict[str, str]]] = None,
         intent_hint: Optional[str] = None,
         model_id: Optional[str] = None,
+        api_key: Optional[str] = None,
     ) -> Generator[str, None, None]:
         """Yield decoded text chunks as the model generates."""
         self._load()
@@ -354,7 +362,7 @@ class QwenModel(BaseLLMModel):
 
         # ---- API 分支：多模型 OpenAI 兼容接口（流式） ----
         if spec.provider != "local":
-            yield from self._get_api_client(spec).complete_stream(
+            yield from self._get_api_client(spec, api_key).complete_stream(
                 messages, model_id=spec.id, temperature=temperature, max_tokens=max_new_tokens
             )
             return
@@ -401,11 +409,12 @@ class QwenModel(BaseLLMModel):
         tools: List[Dict],
         model_id: Optional[str] = None,
         max_tokens: int = 512,
+        api_key: Optional[str] = None,
     ) -> "ToolDecision":
         spec = self._resolve_model(model_id)
         if spec.provider == "local":
             raise NotImplementedError("本地引擎不支持函数调用（agent_loop 会自动降级为普通生成）")
-        return self._get_api_client(spec).complete_with_tools(
+        return self._get_api_client(spec, api_key).complete_with_tools(
             messages, tools, model_id=spec.id, max_tokens=max_tokens
         )
 
@@ -415,11 +424,12 @@ class QwenModel(BaseLLMModel):
         tools: List[Dict],
         model_id: Optional[str] = None,
         max_tokens: int = 512,
+        api_key: Optional[str] = None,
     ):
         spec = self._resolve_model(model_id)
         if spec.provider == "local":
             raise NotImplementedError("本地引擎不支持函数调用（agent_loop 会自动降级为普通生成）")
-        yield from self._get_api_client(spec).complete_stream_with_tools(
+        yield from self._get_api_client(spec, api_key).complete_stream_with_tools(
             messages, tools, model_id=spec.id, max_tokens=max_tokens
         )
 
@@ -429,6 +439,7 @@ class QwenModel(BaseLLMModel):
         model_id: Optional[str] = None,
         temperature: float = None,
         max_new_tokens: int = None,
+        api_key: Optional[str] = None,
     ) -> Generator[str, None, None]:
         """按原始消息列表流式生成（工具对话历史已在 messages 中）。"""
         self._load()
@@ -437,7 +448,7 @@ class QwenModel(BaseLLMModel):
         spec = self._resolve_model(model_id)
 
         if spec.provider != "local":
-            yield from self._get_api_client(spec).complete_stream(
+            yield from self._get_api_client(spec, api_key).complete_stream(
                 messages, model_id=spec.id, temperature=temperature, max_tokens=max_new_tokens
             )
             return
