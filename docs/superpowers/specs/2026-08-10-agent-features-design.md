@@ -68,7 +68,7 @@
 新增智能体层，集中放在新目录 `src/agents/`（四个文件，职责单一）：
 
 ```
-输入守卫 → 任务调度器(4 类) → 主管分派 ↓
+输入守卫 → 任务调度器（3 类任务 + 寒暄/通用直通）→ 主管分派 ↓
   ├── 法律问答 ────→ 现有流水线不变（新增可选工具调用，模型自主决定）
   ├── 合同审查 ────→ 文档优先 → 专用提示词 → 结构化风险清单 → 核验（含文档引文）
   ├── 时效查询 ────→ 直查注册表 → 确定性结论 → 模型润色 → 来源标注
@@ -168,11 +168,11 @@
 - `src/llm/base.py`：`BaseLLMModel` 新增 `generate_with_tools()` 契约。
 - `src/llm/api_client.py`：新增 `complete_with_tools()`（OpenAI 兼容 function
   calling，百炼全系支持）。
-- `src/llm/qwen_model.py`：`QwenModel` 实现 `generate_with_tools()`；离线 7B
-  抛 NotImplementedError 或直接按「提示词注入」降级——本地引擎不做函数调用，
-  告诉模型「检索结果已由 RAG 提供，直接作答」，等于现状。
-- 本地引擎仍可运行工具模式吗？**不开启**：7B 工具调用能力弱，降级为提示词
-  注入（与指南一致），前端无感知变化。
+- `src/llm/qwen_model.py`：`QwenModel` 实现 `generate_with_tools()`（仅 API 路径）。
+  本地 7B 一律抛 NotImplementedError，`agent_loop` 捕获后自动退回普通生成——
+  即「提示词注入」降级（告诉模型「检索结果已由 RAG 提供，直接作答」，等于现状）。
+- 本地引擎不开启工具模式：7B 工具调用能力弱，降级为提示词注入（与指南一致），
+  前端无感知变化。
 
 ### 5.4 SSE 事件流（解决「工具循环 vs 流式」矛盾）
 
