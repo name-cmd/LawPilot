@@ -21,6 +21,8 @@ from src.pipeline.query_rewriter import (
     is_retrieval_relevant,
     rewrite_for_retrieval,
 )
+from src.agents.task_scheduler import TaskDecision, classify_task
+from src.knowledge_base.law_validity import LawValidityService, build_validity_evidence
 
 
 _REGENERATE_PROMPT_SUFFIX = """
@@ -61,6 +63,10 @@ class PipelineContext:
     user_documents: Optional[List[Dict]] = None
     # 用户选择的模型 id（"auto" 已在路由层解析为具体 id；None = 走引擎默认）
     model_id: Optional[str] = None
+    # 任务调度结果（合同审查 / 时效查询 / 默认法律问答）
+    task: Optional[TaskDecision] = None
+    # 时效查询的确定性证据（任务类型为 validity_check 时非空）
+    validity_evidence: Optional[Dict] = None
 
 
 class AnswerPipeline:
@@ -112,6 +118,11 @@ class AnswerPipeline:
                 model_id=model_id,
             )
 
+        task = classify_task(query, intent, user_documents)
+
+        if task.task_type == "validity_check":
+            return self._run_validity(query, intent, task, history, model_id)
+
         rewrite = (
             rewrite_for_retrieval(query)
             if Config.ENABLE_QUERY_REWRITE
@@ -146,7 +157,9 @@ class AnswerPipeline:
             rag_block=rag_block,
             user_documents=user_documents,
         )
-        system_prompt = get_system_prompt("legal_qa")
+        system_prompt = get_system_prompt(
+            "contract_review" if task.task_type == "contract_review" else "legal_qa"
+        )
 
         response = self.model.generate(
             generation_query,
@@ -283,6 +296,26 @@ class AnswerPipeline:
                 model_id=model_id,
             )
 
+        task = classify_task(query, intent, user_documents)
+
+        # 时效查询快路径：直查注册表 → 确定性证据 + 模型润色（不检索、不核验）
+        if task.task_type == "validity_check":
+            validity = self.verifier.validity if self.verifier else LawValidityService()
+            evidence = build_validity_evidence(task.law_name, validity)
+            return PipelineContext(
+                query=query,
+                intent=intent,
+                task=task,
+                history=history,
+                use_rag=False,
+                system_prompt=get_system_prompt("validity_check"),
+                generation_query=query,
+                context_docs=[evidence["text"]],
+                validity_evidence=evidence,
+                user_documents=user_documents,
+                model_id=model_id,
+            )
+
         rewrite = (
             rewrite_for_retrieval(query)
             if Config.ENABLE_QUERY_REWRITE
@@ -321,6 +354,7 @@ class AnswerPipeline:
         return PipelineContext(
             query=query,
             intent=intent,
+            task=task,
             rewrite=rewrite,
             retrieved_docs=retrieved_docs,
             retrieval_scores=retrieval_scores,
@@ -329,7 +363,9 @@ class AnswerPipeline:
             generation_query=generation_query,
             intent_hint=intent_hint,
             context_docs=context_docs,
-            system_prompt=get_system_prompt("legal_qa"),
+            system_prompt=get_system_prompt(
+                "contract_review" if task.task_type == "contract_review" else "legal_qa"
+            ),
             use_rag=use_rag,
             history=history,
             user_documents=user_documents,
@@ -391,6 +427,8 @@ class AnswerPipeline:
                 "summary": "引用核验进行中…",
             },
             "verification_status": "pending",
+            "task": ctx.task.to_dict() if ctx.task else None,
+            "validity_evidence": ctx.validity_evidence,
         }
         return ctx, meta
 
@@ -484,6 +522,39 @@ class AnswerPipeline:
             "intent": intent.to_dict(),
             "query_rewrite": None,
             "rag_used": False,
+        }
+
+    def _run_validity(
+        self,
+        query: str,
+        intent: IntentResult,
+        task: TaskDecision,
+        history: Optional[List[Dict[str, str]]] = None,
+        model_id: Optional[str] = None,
+    ) -> Dict:
+        validity = self.verifier.validity if self.verifier else LawValidityService()
+        evidence = build_validity_evidence(task.law_name, validity)
+        response = self.model.generate(
+            query,
+            system_prompt=get_system_prompt("validity_check"),
+            context_docs=[evidence["text"]],
+            history=history,
+            model_id=model_id,
+        )
+        return {
+            "query": query,
+            "answer": response,
+            "use_rag": False,
+            "retrieved_articles": [],
+            "citation_verification": dict(_EMPTY_VERIFICATION),
+            "consistency": None,
+            "trust": None,
+            "regeneration_attempts": 0,
+            "intent": intent.to_dict(),
+            "query_rewrite": None,
+            "rag_used": False,
+            "task": task.to_dict(),
+            "validity_evidence": evidence,
         }
 
     def _retrieve_articles(

@@ -89,6 +89,10 @@ class ChatResponse(BaseModel):
     # 实际使用的模型（Auto 解析后落定的结果，供前端展示）
     model_id: Optional[str] = None
     model_name: Optional[str] = None
+    # 任务调度结果（时效查询/合同审查/默认问答；Task 3 起透传，旧前端忽略即可）
+    task: Optional[Dict[str, Any]] = None
+    # 时效查询的确定性证据（task.task_type == "validity_check" 时非空）
+    validity_evidence: Optional[Dict[str, Any]] = None
 
 
 class HealthResponse(BaseModel):

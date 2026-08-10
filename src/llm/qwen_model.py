@@ -56,6 +56,16 @@ _SYSTEM_PROMPT_DOC_ANALYSIS = """你是法信通（LawTrust）智能助手。用
   如需法律咨询，可提出具体问题或上传合同等法律文件。
 - 引用文档具体内容时注明出处（如《文件名》）；不确定处诚实说明，不得编造。"""
 
+_SYSTEM_PROMPT_VALIDITY = """你是法信通（LawTrust）智能助手。用户询问某部法律的时效状态（是否有效/已废止）。
+
+回答要求：
+- 核心结论必须以「法律时效注册表」提供的事实为准（废止日期、替代法律），
+  不得编造、不得推测废止时间；
+- 用自然语言组织结论（如：《婚姻法》已于2021年1月1日废止，相关内容由《中华人民共和国民法典》吸收），
+  并补充一句实务提示（如相关事项现按民法典相应编章处理）；
+- 不引用法条原文，不使用【结论】【法律分析】【依据法条】三段式结构；
+- 若注册表未收录该法律，如实说明。"""
+
 # backward-compatible alias
 _SYSTEM_PROMPT = _SYSTEM_PROMPT_LEGAL
 
@@ -70,6 +80,8 @@ def get_system_prompt(intent: str = "legal_qa", document_mode: bool = False) -> 
         return _SYSTEM_PROMPT_GREETING
     if intent == "general_non_legal":
         return _SYSTEM_PROMPT_GENERAL
+    if intent == "validity_check":
+        return _SYSTEM_PROMPT_VALIDITY
     return _SYSTEM_PROMPT_LEGAL
 
 

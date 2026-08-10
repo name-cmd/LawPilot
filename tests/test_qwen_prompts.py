@@ -34,3 +34,9 @@ def test_document_mode():
 def test_document_mode_priority():
     """document_mode 优先于意图判断（即使 intent=legal_qa）"""
     assert "总结文档" in get_system_prompt("legal_qa", document_mode=True)
+
+
+def test_validity_prompt():
+    """时效查询提示词：以注册表为准、不套三段式"""
+    p = get_system_prompt("validity_check")
+    assert "注册表" in p and _MANDATORY_TEMPLATE not in p
