@@ -1,0 +1,12 @@
+[
+  {"id": "ac01", "prompt": "工伤认定的申请时效是多久？", "gold_law": "工伤保险条例", "gold_article": "第十七条", "answer": "30日内提出工伤认定申请"},
+  {"id": "ac02", "prompt": "劳动仲裁时效与普通诉讼时效有什么区别？", "gold_law": "劳动争议调解仲裁法", "gold_article": "第二十七条", "answer": "仲裁时效一年"},
+  {"id": "ac03", "prompt": "婚姻法现在还有效吗？", "gold_law": "", "gold_article": "", "answer": "已废止，由民法典吸收"},
+  {"id": "ac04", "prompt": "合同法废止后相关合同纠纷看什么法律？", "gold_law": "", "gold_article": "", "answer": "民法典合同编"},
+  {"id": "ac05", "prompt": "试用期工资不得低于多少？", "gold_law": "劳动合同法", "gold_article": "第二十条", "answer": "不得低于约定工资的百分之八十"},
+  {"id": "ac06", "prompt": "用人单位单方解除劳动合同需要提前多久通知？", "gold_law": "劳动合同法", "gold_article": "第四十条", "answer": "提前三十日书面通知"},
+  {"id": "ac07", "prompt": "担保法还有效吗？民间借贷的担保适用什么规定？", "gold_law": "", "gold_article": "", "answer": "担保法已废止，适用民法典"},
+  {"id": "ac08", "prompt": "交通事故赔偿与工伤赔偿能同时主张吗？", "gold_law": "", "gold_article": "", "answer": "可以，分别按侵权与工伤主张"},
+  {"id": "ac09", "prompt": "民间借贷利率的合法上限是多少？", "gold_law": "民法典", "gold_article": "第六百八十条", "answer": "不得超过合同成立时一年期贷款市场报价利率四倍"},
+  {"id": "ac10", "prompt": "连续工作满十年可以要求签订无固定期限劳动合同吗？", "gold_law": "劳动合同法", "gold_article": "第十四条", "answer": "可以"}
+]
