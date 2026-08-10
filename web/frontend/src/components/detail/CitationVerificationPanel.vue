@@ -14,6 +14,7 @@ const props = defineProps<{
 
 const citations = computed(() => props.verification?.extracted_citations || [])
 const implicits = computed(() => props.verification?.implicit_claims || [])
+const docQuotes = computed(() => props.verification?.document_quote_checks || [])
 
 function severityClass(c: ExtractedCitation) {
   if (c.severity === 'error') return 'border-danger/40'
@@ -38,7 +39,7 @@ function verdictClass(v?: string) {
 
   <!-- 无数据 -->
   <div
-    v-else-if="!citations.length && !implicits.length"
+    v-else-if="!citations.length && !implicits.length && !docQuotes.length"
     class="px-1 pt-10 text-center text-[12px] text-muted"
   >
     无显式引用或未检测
@@ -89,6 +90,21 @@ function verdictClass(v?: string) {
           <p class="text-[11px] leading-relaxed text-ink">
             {{ (c.reference_excerpt || c.actual_content || '').slice(0, 400) }}
           </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 文档引文核验（合同审查） -->
+    <div v-if="docQuotes.length" class="space-y-2">
+      <div class="text-[12px] font-semibold text-ink">文档引文核验</div>
+      <div
+        v-for="(q, i) in docQuotes" :key="`dq-${i}`"
+        class="rounded-xl border bg-surface p-3"
+        :class="q.verdict === 'verified' ? 'border-line' : 'border-warning/40'"
+      >
+        <div class="text-[12px] text-ink">{{ q.text }}</div>
+        <div class="mt-1 text-[11px] font-semibold" :class="q.verdict === 'verified' ? 'text-success' : 'text-warning'">
+          {{ q.verdict === 'verified' ? '✓ 与上传文档原文一致' : '⚠ 上传文档中未找到此内容' }}
         </div>
       </div>
     </div>

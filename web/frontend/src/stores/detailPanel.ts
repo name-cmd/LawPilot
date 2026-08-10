@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia'
 import { useSessionsStore } from './sessions'
 
-/** 与旧版一致：trust=可信评估 / articles=法条溯源 / verification=引用核验 */
-export type DetailTab = 'trust' | 'articles' | 'verification'
+/** 与旧版一致：trust=可信评估 / articles=法条溯源 / verification=引用核验 / trace=工具轨迹（有工具轨迹时显示） */
+export type DetailTab = 'trust' | 'articles' | 'verification' | 'trace'
 
 /**
  * 详情面板状态（不持久化）。

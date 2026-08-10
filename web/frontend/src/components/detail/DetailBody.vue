@@ -5,6 +5,7 @@ import { ChevronBackOutline } from '@vicons/ionicons5'
 import TrustEvalPanel from './TrustEvalPanel.vue'
 import ArticleTracePanel from './ArticleTracePanel.vue'
 import CitationVerificationPanel from './CitationVerificationPanel.vue'
+import ToolTracePanel from './ToolTracePanel.vue'
 import { useDetailPanelStore } from '@/stores/detailPanel'
 import { useSessionsStore } from '@/stores/sessions'
 import { useVerificationWS } from '@/composables/useVerificationWS'
@@ -64,6 +65,7 @@ watch(
       <n-tab-pane name="trust" tab="可信评估" />
       <n-tab-pane name="articles" tab="法条溯源" />
       <n-tab-pane name="verification" tab="引用核验" />
+      <n-tab-pane v-if="meta?.tool_trace?.length" name="trace" tab="工具轨迹" />
     </n-tabs>
 
     <!-- 未选择消息 -->
@@ -86,6 +88,10 @@ watch(
       <ArticleTracePanel
         v-else-if="detail.activeTab === 'articles'"
         :articles="meta.retrieved_articles || []"
+      />
+      <ToolTracePanel
+        v-else-if="detail.activeTab === 'trace'"
+        :steps="meta.tool_trace || []"
       />
       <CitationVerificationPanel
         v-else

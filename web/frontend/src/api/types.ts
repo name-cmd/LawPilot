@@ -144,6 +144,8 @@ export interface CitationVerification {
   implicit_claims: ImplicitClaim[]
   overall_citation_score: number
   summary: string
+  /** 文档引文核验（合同审查场景，回答中引用上传文档的原文逐字比对） */
+  document_quote_checks?: { text: string; found: boolean; verdict: string; in_document: boolean }[]
 }
 
 // 六维可信评估（对齐 src/trust_eval/legal_trust_scorer.py 输出）
