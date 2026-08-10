@@ -56,3 +56,20 @@ def test_registry_driven_law_names():
 
 def test_default_fallback():
     assert classify_task("劳动仲裁怎么申请？", _legal_intent("劳动仲裁怎么申请？")).task_type == "legal_qa"
+
+
+def test_contract_clause_question_without_docs_not_review():
+    """「劳动合同试用期条款违法怎么办？」是标准法律问答，不应误判合同审查。"""
+    assert classify_task("劳动合同试用期条款违法怎么办？", _legal_intent("劳动合同试用期条款违法怎么办？")).task_type == "legal_qa"
+
+
+def test_document_with_generic_risk_word_not_contract():
+    """带非合同文档 + 泛用风险词（如判决书「有什么风险」）→ 不判合同审查。"""
+    t = classify_task("这份材料有什么风险？", _legal_intent("这份材料有什么风险？"), _DOCS)
+    assert t.task_type == "legal_qa"
+
+
+def test_non_legal_intent_guard():
+    """非 legal_qa 意图（general_non_legal）→ 不做任务细化，直接落回 legal_qa。"""
+    t = classify_task("帮我审一下这个游戏", IntentResult("general_non_legal", 0.88, "非法律"), None)
+    assert t.task_type == "legal_qa"

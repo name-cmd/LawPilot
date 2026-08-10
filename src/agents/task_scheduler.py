@@ -15,9 +15,9 @@ from src.config import Config
 from src.pipeline.intent_router import IntentResult
 
 # 合同审查提问信号（与「是否携带文档」组合判断）
-_CONTRACT_REVIEW_RE = re.compile(r"审查|风险|条款|把关|漏洞|合规|审一下|帮我审|帮忙审|这份合同|这份协议|(合同|协议).*(风险|审查|条款|问题)")
+_CONTRACT_REVIEW_RE = re.compile(r"帮我审|审一下|帮忙审|审查|把关|漏洞|这份合同|这份协议|(合同|协议).*(风险|条款|问题|审查)")
 # 无文档时的强个人审查意图（此时输出引导上传）
-_CONTRACT_REVIEW_NO_DOC_RE = re.compile(r"帮我审|审一下|帮忙审|看看.*(合同|协议)|(合同|协议).*(审查|风险|条款)")
+_CONTRACT_REVIEW_NO_DOC_RE = re.compile(r"帮我审|审一下|帮忙审|帮我看看.*(合同|协议)|(合同|协议).*(审查|风险|把关)")
 # 时效查询提问信号
 _VALIDITY_QUERY_RE = re.compile(r"还有效|有效吗|是否有效|废止|作废|失效|还有没有效|现在.*适用|替代|新法|生效")
 
@@ -55,7 +55,10 @@ def classify_task(
     user_documents: Optional[List[Dict]] = None,
     registry_path: Optional[str] = None,
 ) -> TaskDecision:
-    """任务分类：仅在 intent == legal_qa 时细化；其他意图不会被调用。"""
+    """任务分类：仅在 intent == legal_qa 时细化；其他意图不做任务细分。"""
+    if intent.intent != "legal_qa":
+        return TaskDecision("legal_qa", intent.confidence, "非法律问答意图，不做任务细化")
+
     text = (query or "").strip()
     docs = user_documents or []
 
