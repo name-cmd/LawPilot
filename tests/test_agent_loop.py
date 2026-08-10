@@ -119,6 +119,7 @@ def test_not_implemented_degrades_to_plain_generation():
     loop = AgentToolLoop(NoToolsModel([]), FakeStore([]), max_rounds=3)
     events = list(loop.stream(_ctx()))
     assert "".join(e for e in events if isinstance(e, str)) == "轮次耗尽兜底回答"
+    assert loop.answer == "轮次耗尽兜底回答"
 
 
 def test_run_non_streaming():

@@ -158,7 +158,9 @@ class AgentToolLoop:
                         tool_calls = payload
             except NotImplementedError:
                 # 本地引擎不支持函数调用：退回普通生成（等于现状）
-                yield from self.model.generate_stream_messages(messages, model_id=model_id)
+                for chunk in self.model.generate_stream_messages(messages, model_id=model_id):
+                    self.answer += chunk
+                    yield chunk
                 return
 
             if not tool_calls:
