@@ -40,3 +40,9 @@ def test_validity_prompt():
     """时效查询提示词：以注册表为准、不套三段式"""
     p = get_system_prompt("validity_check")
     assert "注册表" in p and _MANDATORY_TEMPLATE not in p
+
+
+def test_contract_prompt():
+    """合同审查提示词：风险清单结构、引用文档原文须一致"""
+    p = get_system_prompt("contract_review")
+    assert "合同风险清单" in p and "修改建议" in p

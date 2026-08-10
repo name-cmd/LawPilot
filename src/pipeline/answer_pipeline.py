@@ -171,7 +171,11 @@ class AnswerPipeline:
         )
 
         verification = (
-            self.verifier.verify(response, retrieved_docs=retrieved_docs)
+            self.verifier.verify(
+                response,
+                retrieved_docs=retrieved_docs,
+                user_documents=user_documents,
+            )
             if rag_used
             else dict(_EMPTY_VERIFICATION)
         )
@@ -196,7 +200,9 @@ class AnswerPipeline:
                 model_id=model_id,
             )
             verification = self.verifier.verify(
-                response, retrieved_docs=retrieved_docs
+                response,
+                retrieved_docs=retrieved_docs,
+                user_documents=user_documents,
             )
             attempts += 1
 
@@ -213,7 +219,9 @@ class AnswerPipeline:
                 model_id=model_id,
             )
             verification = self.verifier.verify(
-                response, retrieved_docs=retrieved_docs
+                response,
+                retrieved_docs=retrieved_docs,
+                user_documents=user_documents,
             )
 
         consistency_report = None
@@ -450,7 +458,11 @@ class AnswerPipeline:
             }
 
         verification = (
-            self.verifier.verify(response, retrieved_docs=ctx.retrieved_docs)
+            self.verifier.verify(
+                response,
+                retrieved_docs=ctx.retrieved_docs,
+                user_documents=ctx.user_documents,
+            )
             if ctx.rag_used
             else dict(_EMPTY_VERIFICATION)
         )

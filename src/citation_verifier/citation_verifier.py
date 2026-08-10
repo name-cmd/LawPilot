@@ -13,6 +13,7 @@ from langchain_core.documents import Document
 from .extractor import CitationExtractor
 from .content_verifier import ContentVerifier
 from .implicit_verifier import ImplicitClaimVerifier
+from src.citation_verifier.document_quotes import DocumentQuoteVerifier
 from src.knowledge_base.vector_store import LawVectorStore
 from src.knowledge_base.embedder import LawEmbedder
 from src.knowledge_base.law_name_resolver import resolve_law_name
@@ -46,11 +47,13 @@ class CitationVerifier:
         self,
         llm_response: str,
         retrieved_docs: Optional[List[Document]] = None,
+        user_documents: Optional[List[Dict]] = None,
     ) -> Dict:
         """
         Verify an LLM response and return a structured report.
 
         retrieved_docs: optional RAG hits — used to check citations align with retrieval.
+        user_documents: 用户上传文档（合同等）——回答引用的文档原文须与文档逐字一致。
         """
         rag_keys = self._rag_article_keys(retrieved_docs)
 
@@ -104,6 +107,12 @@ class CitationVerifier:
         validity_warnings = self.validity.collect_warnings_from_citations(
             citation_results
         )
+        document_quote_checks = None
+        if user_documents:
+            document_quote_checks = DocumentQuoteVerifier().verify(
+                llm_response, user_documents
+            )["document_quote_checks"]
+
         return {
             "extracted_citations": citation_results,
             "implicit_claims": implicit_results,
@@ -112,6 +121,7 @@ class CitationVerifier:
                 citation_results, implicit_results, overall, rag_keys
             ),
             "validity_warnings": validity_warnings,
+            "document_quote_checks": document_quote_checks,
         }
 
     def verify_and_print(self, llm_response: str) -> None:
