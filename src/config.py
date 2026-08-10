@@ -105,5 +105,11 @@ class Config:
     TEMPERATURE_RANGE = [0.3, 0.5, 0.7, 0.9, 1.1]
     CONSISTENCY_THRESHOLD = 0.75
 
+    # ---- 智能体（Agent）----
+    AGENT_ENABLE_TOOLS = True            # 法律问答管线的工具调用开关（仅 API 引擎生效）
+    AGENT_MAX_TOOL_ROUNDS = 3            # 单次回答最大工具调用轮次（防死循环）
+    AGENT_DECISION_MAX_TOKENS = 512      # 每轮工具决策的最大生成 token
+    AGENT_TOOL_ARG_MAX_LEN = 100         # 工具参数长度上限（清洗）
+
     # NLI model (downloaded from HuggingFace at runtime)
     NLI_MODEL_NAME = str(BASE_DIR / "models" / "Erlangshen-Roberta-330M-NLI")
