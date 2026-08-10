@@ -47,6 +47,11 @@ _EMPTY_VERIFICATION = {
     "validity_warnings": [],
 }
 
+# 无文档合同审查的礼貌引导文案：短路返回，零 LLM 调用（设计文档 §4.1/§9）
+_CONTRACT_GUIDANCE_MESSAGE = (
+    "请上传合同文件后再提问，我可为您审查试用期约定、工资、违约金等常见风险条款。"
+)
+
 
 @dataclass
 class PipelineContext:
@@ -71,6 +76,8 @@ class PipelineContext:
     task: Optional[TaskDecision] = None
     # 时效查询的确定性证据（任务类型为 validity_check 时非空）
     validity_evidence: Optional[Dict] = None
+    # 短路文本：非空时生成阶段直接输出该文本（不调用 LLM），用于无文档合同审查引导
+    short_circuit_text: Optional[str] = None
 
 
 class AnswerPipeline:
@@ -124,6 +131,10 @@ class AnswerPipeline:
             )
 
         task = classify_task(query, intent, user_documents)
+
+        if task.task_type == "contract_review" and not user_documents:
+            # 无文档的合同审查：不调用 LLM，直接返回引导上传文案（设计文档 §4.1/§9）
+            return self._run_contract_guidance(query, intent, task, history, model_id)
 
         if task.task_type == "validity_check":
             return self._run_validity(query, intent, task, history, model_id)
@@ -348,6 +359,21 @@ class AnswerPipeline:
 
         task = classify_task(query, intent, user_documents)
 
+        # 无文档的合同审查：短路返回引导文案（SSE 流式直接输出，零 LLM 调用）
+        if task.task_type == "contract_review" and not user_documents:
+            return PipelineContext(
+                query=query,
+                intent=intent,
+                task=task,
+                history=history,
+                use_rag=False,
+                system_prompt=get_system_prompt("greeting"),
+                generation_query=_CONTRACT_GUIDANCE_MESSAGE,
+                short_circuit_text=_CONTRACT_GUIDANCE_MESSAGE,
+                user_documents=user_documents,
+                model_id=model_id,
+            )
+
         # 时效查询快路径：直查注册表 → 确定性证据 + 模型润色（不检索、不核验）
         if task.task_type == "validity_check":
             validity = self.verifier.validity if self.verifier else LawValidityService()
@@ -425,6 +451,11 @@ class AnswerPipeline:
     def generate_answer_stream(
         self, ctx: PipelineContext
     ) -> Generator[str, None, None]:
+        # 短路文本（无文档合同审查引导）：直接输出，不调用模型
+        if ctx.short_circuit_text:
+            yield ctx.short_circuit_text
+            return
+
         if ctx.intent.intent in ("greeting", "general_non_legal"):
             yield from self.model.generate_stream(
                 ctx.query,
@@ -576,6 +607,30 @@ class AnswerPipeline:
             "intent": intent.to_dict(),
             "query_rewrite": None,
             "rag_used": False,
+        }
+
+    def _run_contract_guidance(
+        self,
+        query: str,
+        intent: IntentResult,
+        task: TaskDecision,
+        history: Optional[List[Dict[str, str]]] = None,
+        model_id: Optional[str] = None,
+    ) -> Dict:
+        """无文档合同审查：零 LLM 调用，返回固定引导文案（与 _run_non_legal 同构）。"""
+        return {
+            "query": query,
+            "answer": _CONTRACT_GUIDANCE_MESSAGE,
+            "use_rag": False,
+            "retrieved_articles": [],
+            "citation_verification": dict(_EMPTY_VERIFICATION),
+            "consistency": None,
+            "trust": None,
+            "regeneration_attempts": 0,
+            "intent": intent.to_dict(),
+            "query_rewrite": None,
+            "rag_used": False,
+            "task": task.to_dict(),
         }
 
     def _run_validity(

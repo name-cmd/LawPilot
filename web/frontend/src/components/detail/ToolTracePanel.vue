@@ -10,8 +10,8 @@ defineProps<{ steps: ToolTraceStep[] }>()
       本次回答未调用工具
     </div>
     <div
-      v-for="s in steps"
-      :key="`${s.step}-${s.tool_name}`"
+      v-for="(s, i) in steps"
+      :key="`${s.step}-${s.tool_name}-${i}`"
       class="rounded-xl border border-line bg-surface p-3"
     >
       <div class="flex items-center gap-2 text-[12px]">

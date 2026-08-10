@@ -18,7 +18,7 @@ SEARCH_ARTICLES_TOOL: Dict[str, Any] = {
     "function": {
         "name": "search_articles",
         "description": "在法律知识库中检索相关法条。当现有参考法条可能未覆盖问题的全部关键条文"
-                       "（如问题涉及多部法律、多个条款）时调用；指定法律名称可提高精度。",
+                       "（如问题涉及多部法律、多个条款）时调用。法律名称可选，指定可缩小检索范围。",
         "parameters": {
             "type": "object",
             "properties": {
@@ -58,6 +58,8 @@ def _clean_arg(value: Any) -> str:
 
 def _execute_search_articles(args: Dict[str, Any], store) -> Dict:
     """向量检索执行者。store 只需提供 similarity_search_unique（测试可注入假 store）。"""
+    if store is None:
+        return {"articles": [], "count": 0, "note": "检索服务不可用"}
     query = _clean_arg(args.get("query"))
     if not query:
         return {"articles": [], "count": 0, "note": "检索词为空"}

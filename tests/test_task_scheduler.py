@@ -73,3 +73,11 @@ def test_non_legal_intent_guard():
     """非 legal_qa 意图（general_non_legal）→ 不做任务细化，直接落回 legal_qa。"""
     t = classify_task("帮我审一下这个游戏", IntentResult("general_non_legal", 0.88, "非法律"), None)
     assert t.task_type == "legal_qa"
+
+
+def test_judgment_doc_with_generic_risk_word_not_contract():
+    """判决书 + 泛用风险词（I2 正则钉住）：legal_qa 意图 + 携带文档 + 「风险」
+    但无合同/协议审查信号 → 必须落回 legal_qa，不得误判 contract_review。"""
+    q = "判决书里有什么风险需要注意？"
+    t = classify_task(q, classify_intent(q), _DOCS)
+    assert t.task_type == "legal_qa"
