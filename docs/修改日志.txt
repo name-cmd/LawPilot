@@ -284,3 +284,9 @@
 内容：智能体（Agent）能力落地——任务调度器（合同审查管线输出结构化风险清单 + 文档引文核验；时效查询管线直查注册表出确定性结论）；工具调用引擎（检索法条 / 查询时效 2 个工具，循环上限 3 轮，SSE agent_status 状态事件，前端工具轨迹面板）；effect 对比评测（--mode agent）
 涉及文件：src/agents/（task_scheduler/tools/agent_loop/trace）、src/llm/（base/api_client/qwen_model）、src/pipeline/answer_pipeline.py、src/citation_verifier/（document_quotes + verify 扩展）、web/backend/（main.py/schemas.py）、web/frontend/（types/useChatStream/ChatView/ChatMessage/ToolTracePanel/DetailBody/CitationVerificationPanel）、scripts/run_legal_trust_benchmark.py、data/benchmark/agent_compare.json
 验证：pytest 全绿；npm run build 零类型错误；三类问题（多法条/合同/时效）真实 API 集成验证通过；对比报告产出
+
+===== 2026-08-10 =====
+类型：修复 / 优化
+内容：最终审查波合并前小修复。1) 无文档合同审查礼貌引导（F-1）：answer_pipeline 在 task=contract_review 且无 user_documents 时短路返回固定引导文案「请上传合同文件后再提问……」，run() 与 prepare_context 两处零 LLM 调用（新增 PipelineContext.short_circuit_text 字段 + generate_answer_stream 开头短路直出，SSE 流式路径同样不调模型）；2) ToolTracePanel 轨迹 key 追加索引防同轮同工具碰撞（F-2）；3) 判决书 + 泛用风险词用例钉住 I2 正则（F-3）；4) tools.py：store=None 时 search_articles 返回「检索服务不可用」+ 工具描述去掉「指定法律名称可提高精度」改为「可选，指定缩小范围」（描述与实现一致）（F-4）；5) CLAUDE.md 与指南 8.2 声明 Web 端离线调用暂缓（F-5）；6) .gitignore 忽略 data/benchmark/mock_*.json（F-6）
+涉及文件：src/pipeline/answer_pipeline.py, tests/test_contract_guidance.py（新增）, web/frontend/src/components/detail/ToolTracePanel.vue, tests/test_task_scheduler.py, src/agents/tools.py, CLAUDE.md, docs/项目改进指南.txt, .gitignore, web/frontend/dist
+验证：pytest tests/ -q → 66 passed（63 + 合同引导 3 条新增 + I2 钉住 1 条，原 63 条含新增前基线）；npm run build vue-tsc 零类型错误；提交见最终审查波提交

@@ -91,7 +91,7 @@ python scripts/run_legal_trust_benchmark.py --mode full --mock   # 离线基准�
 ## 其他约定
 
 - 配置中心：`src/config.py`（检索相关度阈值默认 0.35、可信权重、RAG/自一致性开关、LLM_PROVIDER 双模式切换等），改配置优先改这里。
-- 多模型引擎（阶段八）：模型目录统一在 `src/llm/model_registry.py`（7 个模型，全部托管阿里云百炼、共用 `DASHSCOPE_API_KEY`；**新增模型 = 注册表加一行**，前端选择器自动出现）。前端发送框旁模型选择器：离线调用 / API 调用两级，API 下可选 Auto（跟随设置面板的全局默认模型，默认 qwen3.7-plus，`.env` 的 `DEFAULT_API_MODEL` 兜底）或具体模型；离线引擎需 CUDA GPU + 模型文件，未就绪自动置灰。模型选择按请求透传（`model_id` 参数沿 main.py → pipeline → model.generate → api_client 传递，并发不串模型），自一致性核验自动沿用所选模型。LLM 双模式仍保留：`LLM_PROVIDER="api"`（默认）走百炼；`"local"` 走本地 Qwen2.5-7B（fp16 约 14GB 显存，需 CUDA GPU）。API 模式下全项目仅需 bge/NLI 两个小模型，CPU 即可运行，无需 GPU。
+- 多模型引擎（阶段八）：模型目录统一在 `src/llm/model_registry.py`（7 个模型，全部托管阿里云百炼、共用 `DASHSCOPE_API_KEY`；**新增模型 = 注册表加一行**，前端选择器自动出现）。前端发送框旁模型选择器：离线调用 / API 调用两级，API 下可选 Auto（跟随设置面板的全局默认模型，默认 qwen3.7-plus，`.env` 的 `DEFAULT_API_MODEL` 兜底）或具体模型；离线引擎需 CUDA GPU + 模型文件，未就绪自动置灰。模型选择按请求透传（`model_id` 参数沿 main.py → pipeline → model.generate → api_client 传递，并发不串模型），自一致性核验自动沿用所选模型。LLM 双模式仍保留：`LLM_PROVIDER="api"`（默认）走百炼；`"local"` 走本地 Qwen2.5-7B（fp16 约 14GB 显存，需 CUDA GPU）。API 模式下全项目仅需 bge/NLI 两个小模型，CPU 即可运行，无需 GPU。Web 端离线调用暂缓（选中即提示暂未启用），本地引擎仅 CLI demo.py 支持。
 - 运行依赖 GPU（仅本地模式）：Qwen2.5-7B 本地推理（fp16 约 14GB 显存），无 CUDA 时请使用 API 模式。
 - 数据流链路：`data/raw` → `convert_md_to_json` → `data/processed` → `build_knowledge_base` → `law_db`。
 - 代码风格：保持现有 Python + 中文注释、模块职责单一的风格。
