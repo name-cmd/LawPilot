@@ -410,8 +410,17 @@ async function runChatPipeline(
     }
   } catch (e) {
     if (isAbortError(e)) {
-      // 用户主动取消：保留半截回答，标记完成
-      sessions.updateMessage(assistantMsgId, { loading: false, thinkingText: undefined })
+      // 用户主动取消：保留半截回答，标记完成；同时清理瞬态 agent_status
+      // （否则状态行永久显示「● 正在检索法条：…」，且 persist deep 监听会把
+      // 陈旧状态写入 localStorage，刷新后重现）
+      sessions.updateMessage(assistantMsgId, {
+        loading: false,
+        thinkingText: undefined,
+        meta: {
+          ...(sessions.currentSession?.messages.find((x) => x.id === assistantMsgId)?.meta || {}),
+          agent_status: undefined,
+        },
+      })
       return
     }
     console.warn('[ChatView] 问答失败', e)
