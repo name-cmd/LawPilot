@@ -277,8 +277,16 @@ async function runChatPipeline(
               requested_model: requestedModel,
               model_id: meta.model_id,
               model_name: meta.model_name,
+              // 任务类型优先取顶层字段；后端 Task 8 实际发送的是嵌套 task 对象
+              // （task.task_type），双源兼容保证 meta.task_type 一定落盘
+              task_type: meta.task_type ?? meta.task?.task_type,
+              validity_evidence: meta.validity_evidence,
             },
           })
+        },
+        onAgentStatus: (s) => {
+          const m = sessions.currentSession?.messages.find((x) => x.id === assistantMsgId)
+          if (m) m.meta = { ...(m.meta || {}), agent_status: s }
         },
         onToken: (text) => {
           const m = sessions.currentSession?.messages.find((x) => x.id === assistantMsgId)
@@ -303,6 +311,11 @@ async function runChatPipeline(
               // 非法律回答后端不启动引用核验任务：清除 onMeta 写入的「核验中」
               // 状态，避免气泡永久显示「引用核验中…」
               verification_status: undefined,
+              // 流式结束统一清理瞬态 agent_status 并落盘任务元信息
+              agent_status: undefined,
+              task_type: done.task_type ?? done.task?.task_type,
+              validity_evidence: done.validity_evidence,
+              tool_trace: done.tool_trace,
             }
             // 寒暄等非法律回答：关闭详情面板，避免旧评估误导
             detail.close()
@@ -316,6 +329,11 @@ async function runChatPipeline(
               requested_model: requestedModel,
               model_id: done.model_id ?? meta.model_id,
               model_name: done.model_name ?? meta.model_name,
+              // 流式结束统一清理瞬态 agent_status 并落盘任务元信息
+              agent_status: undefined,
+              task_type: done.task_type ?? done.task?.task_type,
+              validity_evidence: done.validity_evidence,
+              tool_trace: done.tool_trace,
             }
             // 法律类回答：自动在右侧面板展示可信评估（追问时自动切到最新回答）
             detail.autoShow(assistantMsgId)
@@ -323,7 +341,15 @@ async function runChatPipeline(
             // RAG 未命中或纯文档分析：后端不启动引用核验任务，
             // 清除 onMeta 写入的「核验中」状态，避免消息永久显示「引用核验中…」
             const m = sessions.currentSession?.messages.find((x) => x.id === assistantMsgId)
-            patch.meta = { ...(m?.meta || {}), verification_status: undefined }
+            patch.meta = {
+              ...(m?.meta || {}),
+              verification_status: undefined,
+              // 流式结束统一清理瞬态 agent_status 并落盘任务元信息
+              agent_status: undefined,
+              task_type: done.task_type ?? done.task?.task_type,
+              validity_evidence: done.validity_evidence,
+              tool_trace: done.tool_trace,
+            }
           }
           sessions.updateMessage(assistantMsgId, patch as never)
           // 仅 RAG 回答会启动核验后台任务（done.trust 即后端 score_fast 结果），连接 WS 等待完整核验
@@ -365,6 +391,12 @@ async function runChatPipeline(
               requested_model: requestedModel,
               model_id: data.model_id as string | undefined,
               model_name: data.model_name as string | undefined,
+              // 同步路径同样清理瞬态 agent_status 并落盘任务元信息
+              // （后端 ChatResponse 的 task 为嵌套对象，取 task.task_type）
+              agent_status: undefined,
+              task_type: (data.task as { task_type?: string } | null | undefined)?.task_type,
+              validity_evidence: data.validity_evidence,
+              tool_trace: data.tool_trace,
             }
             // 降级回答同样自动展示可信评估
             detail.autoShow(assistantMsgId)

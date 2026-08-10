@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { streamChat, chatSync } from '@/api/chat'
-import type { ChatRequest, DoneEvent, MetaEvent } from '@/api/types'
+import type { AgentStatusEvent, ChatRequest, DoneEvent, MetaEvent } from '@/api/types'
 
 /** 是否用户主动取消（AbortController.abort），取消不触发降级 */
 export function isAbortError(e: unknown): boolean {
@@ -45,6 +45,8 @@ export async function parseSSE(
 export interface StreamCallbacks {
   onMeta?: (m: MetaEvent) => void
   onToken?: (text: string) => void
+  /** 智能体工具调用状态事件（running/done/error/generating） */
+  onAgentStatus?: (s: AgentStatusEvent) => void
   onDone?: (d: DoneEvent) => void
   /** 流式失败、开始降级前的钩子（调用方清空半截回答、改思考文字） */
   onFallbackStart?: () => void
@@ -72,6 +74,7 @@ export function useChatStream() {
     await parseSSE(reader, (event, data) => {
       if (event === 'meta') cb.onMeta?.(data as MetaEvent)
       else if (event === 'token') cb.onToken?.((data as { content?: string }).content || '')
+      else if (event === 'agent_status') cb.onAgentStatus?.(data as AgentStatusEvent)
       else if (event === 'done') cb.onDone?.(data as DoneEvent)
       else if (event === 'error') {
         throw new Error((data as { message?: string }).message || '生成失败')

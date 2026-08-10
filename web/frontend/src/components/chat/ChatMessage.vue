@@ -128,6 +128,35 @@ function onCopy() {
           <ThinkingBubble class="inline-flex" />
         </div>
 
+        <!-- 智能体工具调用状态（流式期间实时更新，done 后消失） -->
+        <div
+          v-if="message.meta?.agent_status"
+          class="mb-2 flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-[12px] text-muted"
+        >
+          <span class="text-brand-500">
+            {{ message.meta.agent_status.status === 'running' ? '●' : '✓' }}
+          </span>
+          <span v-if="message.meta.agent_status.status === 'running'">
+            {{ message.meta.agent_status.detail || '智能体思考中…' }}
+          </span>
+          <span v-else-if="message.meta.agent_status.status === 'generating'">
+            {{ message.meta.agent_status.detail || '综合生成最终回答…' }}
+          </span>
+          <span v-else :class="message.meta.agent_status.status === 'error' ? 'text-danger' : 'text-success'">
+            {{ message.meta.agent_status.result_summary || '工具调用完成' }}
+          </span>
+        </div>
+
+        <!-- 时效查询来源标注（确定性结论来自注册表） -->
+        <div
+          v-if="message.meta?.validity_evidence"
+          class="mb-2 inline-flex items-center gap-1 rounded border border-line bg-page px-2 py-0.5 text-[11px] text-muted"
+          title="结论事实来自法律时效注册表，非模型生成"
+        >
+          <span class="text-brand-500">◈</span>
+          <span>来源：法律时效注册表</span>
+        </div>
+
         <!-- 回答内容（拒答消息走下面的提示条，不重复渲染） -->
         <AnswerContent
           v-if="!message.refusal"

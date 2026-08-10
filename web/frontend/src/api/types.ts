@@ -218,6 +218,14 @@ export interface MessageMeta {
   /** 实际使用的模型（后端 Auto 解析后落定） */
   model_id?: string
   model_name?: string
+  /** 任务类型（legal_qa / contract_review / validity_check） */
+  task_type?: string
+  /** 工具调用轨迹（智能体模式） */
+  tool_trace?: ToolTraceStep[]
+  /** 时效查询的确定性证据（validity_check 时存在） */
+  validity_evidence?: Record<string, unknown> | null
+  /** 瞬态：流式中的智能体状态（done 后清除） */
+  agent_status?: AgentStatusEvent
 }
 
 // ── SSE 事件（/api/chat/stream）─────────────────────────
@@ -229,6 +237,10 @@ export interface MetaEvent {
   /** 首事件必发：实际使用的模型 */
   model_id?: string
   model_name?: string
+  /** 任务调度结果（task.task_type 为 legal_qa / contract_review / validity_check） */
+  task?: { task_type?: string; confidence?: number; reason?: string; law_name?: string } | null
+  task_type?: string
+  validity_evidence?: Record<string, unknown> | null
 }
 
 export interface DoneEvent {
@@ -239,6 +251,10 @@ export interface DoneEvent {
   intent?: MessageMeta['intent']
   model_id?: string
   model_name?: string
+  task?: { task_type?: string; confidence?: number; reason?: string; law_name?: string } | null
+  task_type?: string
+  validity_evidence?: Record<string, unknown> | null
+  tool_trace?: ToolTraceStep[]
 }
 
 export interface ErrorEvent {
@@ -248,6 +264,7 @@ export interface ErrorEvent {
 export type SSEEventMap = {
   meta: MetaEvent
   token: { content: string }
+  agent_status: AgentStatusEvent
   done: DoneEvent
   error: ErrorEvent
 }
@@ -267,4 +284,25 @@ export interface VerificationError {
   type: 'verification_error'
   message_id: string
   error: string
+}
+
+// ── 智能体（对齐 src/agents/trace.py）────────────────────
+/** SSE agent_status 事件负载（流式中的生成中状态行） */
+export interface AgentStatusEvent {
+  step: number
+  tool_name?: string
+  /** running | done | error | generating */
+  status: string
+  detail?: string
+  result_summary?: string
+}
+
+/** 工具调用轨迹中的一步（随 done 事件返回，详情面板展示） */
+export interface ToolTraceStep {
+  step: number
+  tool_name: string
+  arguments: Record<string, unknown>
+  result_summary: string
+  success: boolean
+  cost_ms: number
 }
