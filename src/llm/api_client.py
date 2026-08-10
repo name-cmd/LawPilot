@@ -251,29 +251,52 @@ class APIClient:
         temperature: float = 0.0,
         max_tokens: int = 512,
     ) -> "ToolDecision":
-        """非流式工具决策。temperature 固定 0.0：决策要稳定可复现。"""
+        """非流式工具决策。temperature 固定 0.0：决策要稳定可复现。
+
+        重试语义与 complete 一致：可重试错误（网络/限流/5xx）自动退避重试，
+        认证/参数类错误立即抛出（中文包装）。
+        """
         from src.llm.base import ToolCall, ToolDecision
 
         kwargs = self._request_kwargs(model_id, messages, temperature, max_tokens, stream=False)
         kwargs["tools"] = tools
         kwargs["tool_choice"] = "auto"
-        resp = self._get_client().chat.completions.create(**kwargs)
-        self._log_usage(model_id, resp)
-        msg = resp.choices[0].message
-        if not getattr(msg, "tool_calls", None):
-            return ToolDecision(text=msg.content or "", tool_calls=[])
-        calls = []
-        for tc in msg.tool_calls:
+
+        last_exc = None
+        for attempt in range(Config.API_MAX_RETRIES + 1):
             try:
-                args = json.loads(tc.function.arguments or "{}")
-            except json.JSONDecodeError:
-                args = {}
-            calls.append(ToolCall(
-                id=tc.id or "",
-                name=tc.function.name or "",
-                arguments=args if isinstance(args, dict) else {},
-            ))
-        return ToolDecision(text="", tool_calls=calls)
+                resp = self._get_client().chat.completions.create(**kwargs)
+                self._log_usage(model_id, resp)
+                msg = resp.choices[0].message
+                if not getattr(msg, "tool_calls", None):
+                    return ToolDecision(text=msg.content or "", tool_calls=[])
+                calls = []
+                for tc in msg.tool_calls:
+                    try:
+                        args = json.loads(tc.function.arguments or "{}")
+                    except json.JSONDecodeError:
+                        args = {}
+                    calls.append(ToolCall(
+                        id=tc.id or "",
+                        name=tc.function.name or "",
+                        arguments=args if isinstance(args, dict) else {},
+                    ))
+                return ToolDecision(text="", tool_calls=calls)
+            except Exception as exc:  # noqa: BLE001 - 统一分类
+                last_exc = exc
+                retryable = self._handle_call_exception(exc, model_id)  # 不可重试的异常在此直接抛出
+                if retryable and attempt < Config.API_MAX_RETRIES:
+                    print(
+                        f"{self.provider_label} API 工具调用失败（{type(exc).__name__}），"
+                        f"{Config.API_MAX_RETRIES - attempt} 秒后重试…"
+                    )
+                    self._sleep_backoff(attempt)
+                elif not retryable:
+                    break
+        raise RuntimeError(
+            f"{self.provider_label} API 工具调用失败（已重试 {Config.API_MAX_RETRIES} 次）："
+            f"{self._friendly_error(model_id, last_exc)}"
+        )
 
     def complete_stream_with_tools(
         self,

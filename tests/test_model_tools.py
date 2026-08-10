@@ -72,3 +72,61 @@ def test_local_engine_raises_not_implemented():
     assert m.supports_tools("local") is False  # "local" 不在注册表 → 视为不支持
     with pytest.raises(NotImplementedError):
         m.complete_with_tools([{"role": "user", "content": "q"}], TOOLS)
+
+
+def test_apiclient_complete_with_tools_retries_on_rate_limit():
+    """APIClient.complete_with_tools：可重试错误自动退避重试，重试后成功并返回正确决策。
+
+    假客户端模拟「前两次抛限流错误、第三次成功」两条路径；
+    断言调用次数 = 1 + 重试次数，且最终决策解析正确（验证重试确实发生）。
+    """
+    from types import SimpleNamespace
+
+    import httpx
+    from openai import RateLimitError
+
+    from src.llm.api_client import APIClient
+
+    attempts = {"n": 0}
+
+    def fake_create(**kwargs):
+        attempts["n"] += 1
+        if attempts["n"] < 3:
+            raise RateLimitError(
+                "rate limited",
+                response=httpx.Response(429, request=httpx.Request("POST", "http://test")),
+                body=None,
+            )
+        # 第三次成功：返回带工具调用的响应（message.tool_calls 结构仿 OpenAI SDK）
+        return SimpleNamespace(
+            usage=None,
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(
+                        content=None,
+                        tool_calls=[
+                            SimpleNamespace(
+                                id="call_1",
+                                function=SimpleNamespace(
+                                    name="search_articles",
+                                    arguments='{"query": "x"}',
+                                ),
+                            )
+                        ],
+                    )
+                )
+            ],
+        )
+
+    client = APIClient(api_key="test-key")
+    client._client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=fake_create))
+    )
+    client._sleep_backoff = lambda attempt: None  # 跳过真实退避等待，测试提速
+
+    dec = client.complete_with_tools(
+        [{"role": "user", "content": "q"}], TOOLS, model_id="qwen-turbo"
+    )
+    assert attempts["n"] == 3  # 1 次初始调用 + 2 次重试
+    assert dec.tool_calls[0].name == "search_articles"
+    assert dec.tool_calls[0].arguments == {"query": "x"}
