@@ -465,7 +465,10 @@ def chat_stream(req: ChatStreamRequest, background_tasks: BackgroundTasks):
             if use_agent:
                 from src.agents.agent_loop import AgentToolLoop
                 from src.knowledge_base.retrieval_utils import merge_unique_docs
+                from src.llm.qwen_model import TOOL_GUIDANCE_SUFFIX
 
+                # 工具模式专用提示词段：仅此分支注入，非工具路径不携带
+                ctx.system_prompt = ctx.system_prompt + TOOL_GUIDANCE_SUFFIX
                 loop = AgentToolLoop(
                     _pipeline.model, _pipeline.store,
                     validity=(_pipeline.verifier.validity if _pipeline.verifier else None),

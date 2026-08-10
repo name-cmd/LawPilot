@@ -14,10 +14,12 @@ def test_legal_default():
     assert _MANDATORY_TEMPLATE in p and "【依据法条】" in p
 
 
-def test_legal_prompt_tool_guidance():
-    """legal_qa 提示词含工具引导句（智能体模式下模型才会主动调用检索工具补检）"""
-    p = get_system_prompt("legal_qa")
-    assert "search_articles" in p and "工具" in p
+def test_legal_prompt_restored_without_tool_guidance():
+    """共享法律提示词不含工具引导（工具引导只注入 agent 分支）"""
+    from src.llm.qwen_model import TOOL_GUIDANCE_SUFFIX, _SYSTEM_PROMPT_LEGAL
+
+    assert "search_articles" in TOOL_GUIDANCE_SUFFIX
+    assert "search_articles" not in _SYSTEM_PROMPT_LEGAL
 
 
 def test_greeting():

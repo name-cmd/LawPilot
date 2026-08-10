@@ -9,7 +9,7 @@ from typing import Dict, Generator, List, Optional, Tuple
 from langchain_core.documents import Document
 
 from src.config import Config
-from src.llm.qwen_model import QwenModel, get_system_prompt
+from src.llm.qwen_model import TOOL_GUIDANCE_SUFFIX, QwenModel, get_system_prompt
 from src.llm.rag_context import format_retrieved_articles
 from src.document_processing.document_context import format_user_documents
 from src.citation_verifier.citation_verifier import CitationVerifier
@@ -179,6 +179,8 @@ class AnswerPipeline:
         if use_tools:
             from src.agents.agent_loop import AgentToolLoop
 
+            # 工具模式专用提示词段：仅此分支注入，非工具路径不携带
+            system_prompt = system_prompt + TOOL_GUIDANCE_SUFFIX
             loop = AgentToolLoop(
                 self.model, self.store,
                 validity=(self.verifier.validity if self.verifier else None),
