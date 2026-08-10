@@ -93,6 +93,8 @@ class ChatResponse(BaseModel):
     task: Optional[Dict[str, Any]] = None
     # 时效查询的确定性证据（task.task_type == "validity_check" 时非空）
     validity_evidence: Optional[Dict[str, Any]] = None
+    # 智能体工具调用轨迹（同步降级路径返回；未启用工具时为空数组）
+    tool_trace: Optional[List[Dict[str, Any]]] = None
 
 
 class HealthResponse(BaseModel):

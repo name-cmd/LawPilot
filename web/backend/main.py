@@ -455,11 +455,40 @@ def chat_stream(req: ChatStreamRequest, background_tasks: BackgroundTasks):
                 )
                 return
 
-            parts = []
-            for chunk in _pipeline.generate_answer_stream(ctx):
-                parts.append(chunk)
-                yield _sse_event("token", {"content": chunk})
-            answer = "".join(parts)
+            # ---- 智能体工具模式：法律问答 + 工具可用（API 引擎） ----
+            use_agent = (
+                Config.AGENT_ENABLE_TOOLS
+                and ctx.task is not None
+                and ctx.task.task_type == "legal_qa"
+                and _pipeline.model.supports_tools(spec.id)
+            )
+            if use_agent:
+                from src.agents.agent_loop import AgentToolLoop
+                from src.knowledge_base.retrieval_utils import merge_unique_docs
+
+                loop = AgentToolLoop(
+                    _pipeline.model, _pipeline.store,
+                    validity=(_pipeline.verifier.validity if _pipeline.verifier else None),
+                )
+                parts = []
+                for ev in loop.stream(ctx, model_id=spec.id):
+                    if isinstance(ev, str):
+                        parts.append(ev)
+                        yield _sse_event("token", {"content": ev})
+                    else:
+                        yield _sse_event("agent_status", ev.to_dict())
+                answer = "".join(parts)
+                tool_trace = [s.to_dict() for s in loop.trace]
+                if loop.found_docs:
+                    ctx.retrieved_docs = merge_unique_docs(ctx.retrieved_docs, loop.found_docs)
+                    ctx.rag_used = True
+            else:
+                parts = []
+                for chunk in _pipeline.generate_answer_stream(ctx):
+                    parts.append(chunk)
+                    yield _sse_event("token", {"content": chunk})
+                answer = "".join(parts)
+                tool_trace = []
 
             partial_trust = None
             if _trust_scorer and ctx.rag_used:
@@ -473,6 +502,9 @@ def chat_stream(req: ChatStreamRequest, background_tasks: BackgroundTasks):
                     "trust": partial_trust,
                     "model_id": spec.id,
                     "model_name": spec.display_name,
+                    "task": ctx.task.to_dict() if ctx.task else None,
+                    "validity_evidence": ctx.validity_evidence,
+                    "tool_trace": tool_trace,
                 },
             )
 

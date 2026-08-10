@@ -53,3 +53,15 @@ def test_k_limit():
 def test_empty():
     assert merge([], k=5) == []
     assert merge([[], []], k=5) == []
+
+
+def test_merge_unique_docs():
+    """工具检索结果与初始检索结果按（法律名, 条号）去重合并"""
+    from src.knowledge_base.retrieval_utils import merge_unique_docs
+
+    def d(law, num):
+        return Document(page_content=f"{law}{num}内容", metadata={"law_name": law, "article_num": num})
+
+    merged = merge_unique_docs([d("劳动合同法", "第38条")], [d("劳动合同法", "第38条"), d("工伤保险条例", "第17条")])
+    assert len(merged) == 2
+    assert merged[1].metadata["law_name"] == "工伤保险条例"

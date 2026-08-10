@@ -14,7 +14,11 @@ from src.llm.rag_context import format_retrieved_articles
 from src.document_processing.document_context import format_user_documents
 from src.citation_verifier.citation_verifier import CitationVerifier
 from src.uncertainty.self_consistency import SelfConsistencyChecker
-from src.knowledge_base.retrieval_utils import article_key, format_article_record
+from src.knowledge_base.retrieval_utils import (
+    article_key,
+    format_article_record,
+    merge_unique_docs,
+)
 from src.pipeline.intent_router import IntentResult, classify_intent
 from src.pipeline.query_rewriter import (
     RewriteResult,
@@ -95,6 +99,7 @@ class AnswerPipeline:
         history: Optional[List[Dict[str, str]]] = None,
         user_documents: Optional[List[Dict]] = None,
         model_id: Optional[str] = None,
+        agent_tools: bool = False,
     ) -> Dict:
         max_regeneration = (
             max_regeneration
@@ -161,14 +166,47 @@ class AnswerPipeline:
             "contract_review" if task.task_type == "contract_review" else "legal_qa"
         )
 
-        response = self.model.generate(
-            generation_query,
-            system_prompt=system_prompt,
-            context_docs=context_docs,
-            history=history,
-            intent_hint=intent_hint,
-            model_id=model_id,
+        # 智能体工具模式：开关打开 + 模型支持函数调用 + 任务为法律问答时启用。
+        # AgentToolLoop 在函数内惰性导入：agent_loop 顶部会回引本模块的
+        # PipelineContext，顶层导入会造成循环导入（import 阶段类尚未定义）。
+        use_tools = (
+            agent_tools
+            and Config.AGENT_ENABLE_TOOLS
+            and self.model.supports_tools(model_id)
+            and (task is None or task.task_type == "legal_qa")
         )
+        tool_trace = []
+        if use_tools:
+            from src.agents.agent_loop import AgentToolLoop
+
+            loop = AgentToolLoop(
+                self.model, self.store,
+                validity=(self.verifier.validity if self.verifier else None),
+            )
+            temp_ctx = PipelineContext(
+                query=query, intent=intent, task=task,
+                generation_query=generation_query,
+                intent_hint=intent_hint,
+                context_docs=context_docs,
+                system_prompt=system_prompt,
+                history=history,
+                user_documents=user_documents,
+                model_id=model_id,
+            )
+            response, trace_steps = loop.run(temp_ctx, model_id=model_id)
+            tool_trace = [s.to_dict() for s in trace_steps]
+            if loop.found_docs:
+                retrieved_docs = merge_unique_docs(retrieved_docs, loop.found_docs)
+                rag_used = True
+        else:
+            response = self.model.generate(
+                generation_query,
+                system_prompt=system_prompt,
+                context_docs=context_docs,
+                history=history,
+                intent_hint=intent_hint,
+                model_id=model_id,
+            )
 
         verification = (
             self.verifier.verify(
@@ -258,6 +296,8 @@ class AnswerPipeline:
             "intent": intent.to_dict(),
             "query_rewrite": rewrite.to_dict(),
             "rag_used": rag_used,
+            "task": task.to_dict() if task else None,
+            "tool_trace": tool_trace,
         }
 
     def prepare_context(

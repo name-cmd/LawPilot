@@ -53,3 +53,25 @@ def format_article_record(
         # Chroma returns distance; convert to 0-1 relevance for display
         record["relevance_score"] = round(max(0.0, min(1.0, 1.0 - relevance_score / 2.0)), 3)
     return record
+
+
+def merge_unique_docs(
+    existing: List[Document],
+    found: List[Document],
+) -> List[Document]:
+    """按（法律名, 条号）去重合并两组检索结果（工具检索结果并入初始结果）。"""
+    seen = set()
+    out: List[Document] = []
+    for doc in existing:
+        key = article_key(doc)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(doc)
+    for doc in found:
+        key = article_key(doc)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(doc)
+    return out
