@@ -185,9 +185,24 @@ class AgentToolLoop:
             step=used, status="generating",
             detail=f"已到达工具调用轮次上限（{self.max_rounds} 轮），综合生成最终回答…",
         )
+        before = len(self.answer)
         for chunk in self.model.generate_stream_messages(messages, model_id=model_id):
             self.answer += chunk
             yield chunk
+        if len(self.answer) == before:
+            # 流式兜底为空（部分模型对工具历史返回空流，如 kimi）：
+            # 非流式再问一次，保证最终回答不为空
+            text = self.model.generate(
+                ctx.generation_query,
+                system_prompt=ctx.system_prompt,
+                context_docs=ctx.context_docs,
+                history=ctx.history,
+                intent_hint=ctx.intent_hint,
+                model_id=model_id,
+            )
+            if text:
+                self.answer += text
+                yield text
 
     def run(self, ctx: PipelineContext, model_id: Optional[str] = None) -> Tuple[str, List[ToolTraceStep]]:
         """非流式版（/api/chat 同步路径）：返回 (最终回答, 轨迹)。

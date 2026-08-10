@@ -99,6 +99,31 @@ def test_round_exhaustion_falls_back():
     assert any(isinstance(e, AgentStatusEvent) and e.status == "generating" for e in events)
 
 
+def test_empty_fallback_uses_non_streaming_generate():
+    """轮次耗尽后流式兜底为空（部分模型对工具历史返回空流）→ 非流式再问一次，
+    保证最终回答不为空（kimi 场景：3 轮全部调工具后兜底空流）。"""
+    class EmptyStreamModel(FakeModel):
+        def generate_stream_messages(self, messages, model_id=None, temperature=None, max_new_tokens=None):
+            if False:
+                yield ""  # 保持生成器函数；实际为空流（不产出任何块）
+
+        def generate(self, query, system_prompt=None, temperature=None, max_new_tokens=None,
+                     context_docs=None, history=None, intent_hint=None, model_id=None):
+            return "非流式兜底回答"
+
+    model = EmptyStreamModel([
+        {"kind": "calls", "calls": [ToolCall("c1", "search_articles", {"query": "x"})]},
+        {"kind": "calls", "calls": [ToolCall("c2", "search_articles", {"query": "y"})]},
+        {"kind": "calls", "calls": [ToolCall("c3", "search_articles", {"query": "z"})]},
+    ])
+    loop = AgentToolLoop(model, FakeStore([]), max_rounds=3)
+    events = list(loop.stream(_ctx()))
+    assert "非流式兜底回答" in events
+    assert loop.answer == "非流式兜底回答"
+    assert len(loop.trace) == 3
+    assert any(isinstance(e, AgentStatusEvent) and e.status == "generating" for e in events)
+
+
 def test_unknown_tool_records_failure_and_continues():
     model = FakeModel([
         {"kind": "calls", "calls": [ToolCall("c1", "no_such_tool", {})]},
