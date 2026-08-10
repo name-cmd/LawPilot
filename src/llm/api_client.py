@@ -6,6 +6,7 @@
 阶段八改造：模型改按请求传递（model_id），不再绑定单一模型；
 模型条目（base_url / key_env / 能力）统一由 src/llm/model_registry.py 管理。
 """
+import json
 import os
 import random
 import time
@@ -236,4 +237,118 @@ class APIClient:
                         f"：{self._friendly_error(model_id, exc)}"
                     )
                 print(f"{self.provider_label} API 流式请求失败（{type(exc).__name__}），准备重试…")
+                self._sleep_backoff(attempts - 1)
+
+    # ------------------------------------------------------------------
+    # 工具调用（function calling）
+    # ------------------------------------------------------------------
+
+    def complete_with_tools(
+        self,
+        messages,
+        tools,
+        model_id: str,
+        temperature: float = 0.0,
+        max_tokens: int = 512,
+    ) -> "ToolDecision":
+        """非流式工具决策。temperature 固定 0.0：决策要稳定可复现。"""
+        from src.llm.base import ToolCall, ToolDecision
+
+        kwargs = self._request_kwargs(model_id, messages, temperature, max_tokens, stream=False)
+        kwargs["tools"] = tools
+        kwargs["tool_choice"] = "auto"
+        resp = self._get_client().chat.completions.create(**kwargs)
+        self._log_usage(model_id, resp)
+        msg = resp.choices[0].message
+        if not getattr(msg, "tool_calls", None):
+            return ToolDecision(text=msg.content or "", tool_calls=[])
+        calls = []
+        for tc in msg.tool_calls:
+            try:
+                args = json.loads(tc.function.arguments or "{}")
+            except json.JSONDecodeError:
+                args = {}
+            calls.append(ToolCall(
+                id=tc.id or "",
+                name=tc.function.name or "",
+                arguments=args if isinstance(args, dict) else {},
+            ))
+        return ToolDecision(text="", tool_calls=calls)
+
+    def complete_stream_with_tools(
+        self,
+        messages,
+        tools,
+        model_id: str,
+        temperature: float = 0.0,
+        max_tokens: int = 512,
+    ):
+        """流式工具决策：yield ("text", str)；流内含工具调用时结束前再 yield ("tool_calls", [...]).
+
+        重试语义与 complete_stream 一致：首个产出前的失败才重试；
+        已产出内容后异常立即上抛。
+        """
+        from src.llm.base import ToolCall
+
+        kwargs = self._request_kwargs(model_id, messages, temperature, max_tokens, stream=True)
+        kwargs["tools"] = tools
+        kwargs["tool_choice"] = "auto"
+        produced = False
+        last_exc = None
+        attempts = 0
+
+        while True:
+            attempts += 1
+            try:
+                stream = self._get_client().chat.completions.create(**kwargs)
+                acc: dict = {}
+                has_tool_calls = False
+                for chunk in stream:
+                    if not chunk.choices:
+                        continue
+                    delta = chunk.choices[0].delta
+                    if delta is None:
+                        continue
+                    if getattr(delta, "reasoning_content", None):
+                        continue  # 思考链不属于回答内容，跳过
+                    if delta.content:
+                        produced = True
+                        yield ("text", delta.content)
+                    if delta.tool_calls:
+                        has_tool_calls = True
+                        for tc in delta.tool_calls:
+                            idx = tc.index
+                            entry = acc.setdefault(idx, {"id": "", "name": "", "arguments": ""})
+                            if tc.id:
+                                entry["id"] = tc.id
+                            if tc.function:
+                                if tc.function.name:
+                                    entry["name"] += tc.function.name
+                                if tc.function.arguments:
+                                    entry["arguments"] += tc.function.arguments
+                if has_tool_calls:
+                    calls = []
+                    for idx in sorted(acc):
+                        entry = acc[idx]
+                        try:
+                            args = json.loads(entry["arguments"] or "{}")
+                        except json.JSONDecodeError:
+                            args = {}
+                        calls.append(ToolCall(
+                            id=entry["id"],
+                            name=entry["name"],
+                            arguments=args if isinstance(args, dict) else {},
+                        ))
+                    yield ("tool_calls", calls)
+                return
+            except Exception as exc:  # noqa: BLE001 - 统一分类，与 complete_stream 一致
+                last_exc = exc
+                retryable = self._handle_call_exception(exc, model_id)
+                if produced or attempts > Config.API_MAX_RETRIES or not retryable:
+                    raise RuntimeError(
+                        f"{self.provider_label} API 流式工具调用失败"
+                        f"{'（已产出部分内容，停止重试）' if produced else f'（已重试 {Config.API_MAX_RETRIES} 次）'}"
+                        f"：{self._friendly_error(model_id, exc)}"
+                    )
+                print(f"{self.provider_label} API 流式工具调用失败（{type(exc).__name__}），准备重试…")
                 self._sleep_backoff(attempts - 1)

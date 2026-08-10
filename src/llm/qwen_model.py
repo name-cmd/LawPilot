@@ -105,10 +105,27 @@ class QwenModel(BaseLLMModel):
     # ------------------------------------------------------------------
 
     def _resolve_model(self, model_id: Optional[str]) -> ModelSpec:
-        """解析模型：显式参数 > 构造默认 > 全局默认 / 本地。未知或未启用抛 ValueError。"""
+        """解析模型：显式参数 > 构造默认 > 全局默认 / 本地。未知或未启用抛 ValueError。
+
+        本地引擎不在注册表中（"local" 仅为 provider 标识）：provider == "local" 时
+        合成一个 local spec，使 generate / 工具方法能进入本地分支
+        （spec.provider == "local" 是各方法本地分支的判据）。
+        """
         mid = model_id or self.model_id
         if not mid:
             mid = "local" if self.provider == "local" else Config.DEFAULT_API_MODEL
+        if mid == "local":
+            if self.provider != "local":
+                raise ValueError(f"模型「local」仅本地引擎可用（当前 provider={self.provider}）")
+            return ModelSpec(
+                id="local",
+                display_name="本地 Qwen2.5-7B",
+                provider="local",
+                base_url="",
+                key_env="",
+                price_tier="",
+                capabilities="本地 7B 推理（需 CUDA GPU）",
+            )
         return resolve_model_spec(mid)
 
     def _get_api_client(self, spec: ModelSpec) -> APIClient:
@@ -217,6 +234,17 @@ class QwenModel(BaseLLMModel):
         messages.append({"role": "user", "content": user_content})
         return messages
 
+    def build_messages(
+        self,
+        query: str,
+        system_prompt: str,
+        context_docs: Optional[List[str]] = None,
+        history: Optional[List[Dict[str, str]]] = None,
+        intent_hint: Optional[str] = None,
+    ) -> List[Dict[str, str]]:
+        """公开版消息构建（generate / agent_loop 共用）。"""
+        return self._build_messages(query, system_prompt, context_docs, history, intent_hint)
+
     def generate(
         self,
         query: str,
@@ -310,6 +338,87 @@ class QwenModel(BaseLLMModel):
             streamer=streamer,
         )
 
+        thread = threading.Thread(target=self.model.generate, kwargs=gen_kwargs)
+        thread.start()
+        for chunk in streamer:
+            if chunk:
+                yield chunk
+        thread.join()
+
+    # ------------------------------------------------------------------
+    # 工具调用（function calling；仅 API 引擎，本地 7B 不支持）
+    # ------------------------------------------------------------------
+
+    def supports_tools(self, model_id: Optional[str] = None) -> bool:
+        """当前模型是否支持函数调用（API 引擎支持；本地 7B 不支持）。"""
+        try:
+            return self._resolve_model(model_id).provider != "local"
+        except ValueError:
+            return False
+
+    def complete_with_tools(
+        self,
+        messages: List[Dict[str, str]],
+        tools: List[Dict],
+        model_id: Optional[str] = None,
+        max_tokens: int = 512,
+    ) -> "ToolDecision":
+        spec = self._resolve_model(model_id)
+        if spec.provider == "local":
+            raise NotImplementedError("本地引擎不支持函数调用（agent_loop 会自动降级为普通生成）")
+        return self._get_api_client(spec).complete_with_tools(
+            messages, tools, model_id=spec.id, max_tokens=max_tokens
+        )
+
+    def complete_stream_with_tools(
+        self,
+        messages: List[Dict[str, str]],
+        tools: List[Dict],
+        model_id: Optional[str] = None,
+        max_tokens: int = 512,
+    ):
+        spec = self._resolve_model(model_id)
+        if spec.provider == "local":
+            raise NotImplementedError("本地引擎不支持函数调用（agent_loop 会自动降级为普通生成）")
+        yield from self._get_api_client(spec).complete_stream_with_tools(
+            messages, tools, model_id=spec.id, max_tokens=max_tokens
+        )
+
+    def generate_stream_messages(
+        self,
+        messages: List[Dict[str, str]],
+        model_id: Optional[str] = None,
+        temperature: float = None,
+        max_new_tokens: int = None,
+    ) -> Generator[str, None, None]:
+        """按原始消息列表流式生成（工具对话历史已在 messages 中）。"""
+        self._load()
+        temperature = temperature if temperature is not None else Config.LLM_TEMPERATURE
+        max_new_tokens = max_new_tokens or Config.LLM_MAX_NEW_TOKENS
+        spec = self._resolve_model(model_id)
+
+        if spec.provider != "local":
+            yield from self._get_api_client(spec).complete_stream(
+                messages, model_id=spec.id, temperature=temperature, max_tokens=max_new_tokens
+            )
+            return
+
+        # 本地分支：直接对 messages 做 chat template 流式
+        text = self.tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
+        )
+        inputs = self.tokenizer([text], return_tensors="pt").to(self.model.device)
+        streamer = TextIteratorStreamer(
+            self.tokenizer, skip_prompt=True, skip_special_tokens=True
+        )
+        gen_kwargs = dict(
+            **inputs,
+            max_new_tokens=max_new_tokens,
+            temperature=temperature,
+            do_sample=temperature > 0,
+            pad_token_id=self.tokenizer.eos_token_id,
+            streamer=streamer,
+        )
         thread = threading.Thread(target=self.model.generate, kwargs=gen_kwargs)
         thread.start()
         for chunk in streamer:
