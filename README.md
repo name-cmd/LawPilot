@@ -17,7 +17,7 @@ pip install -r requirements.txt
 # 数据与向量库
 python scripts/convert_md_to_json.py
 python scripts/build_knowledge_base.py          # 完整库（只需 bge 嵌入模型，无需 GPU）
-# python scripts/build_demo_knowledge_base.py   # 11 部法律，不含民法典
+# python scripts/build_demo_knowledge_base.py   
 # python scripts/build_minimal_kb.py            # 最小测试库
 
 # 命令行 Demo
@@ -38,7 +38,7 @@ python scripts/run_legal_trust_benchmark.py --mode full --mock
 
 ### 切换云端 API 模式（默认启用，无需 GPU）
 
-LLM 默认走阿里云百炼 API（qwen3.7-plus，新模型各赠送 100 万 token 免费额度 / 90 天）：
+LLM 默认走阿里云百炼 API：
 
 1. 安装依赖后，复制 `.env.example` 为项目根目录 `.env`，填入你的 API Key：
    ```
