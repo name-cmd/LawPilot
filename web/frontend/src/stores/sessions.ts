@@ -66,12 +66,16 @@ export const useSessionsStore = defineStore('sessions', {
       return `${SESSIONS_PREFIX_V2}${auth.username || 'guest'}`
     },
 
-    /** 登录后加载该用户的会话：v1 迁移 + hydrate + 兜底建会话 */
+    /** 登录后加载该用户的会话：v1 迁移 + 清空旧账号内存数据 + hydrate + 兜底建会话 */
     async loadForCurrentUser() {
       const auth = useAuthStore()
       if (auth.username) {
         migrateJson(`${SESSIONS_PREFIX_V1}${auth.username}`, this.storageKeyV2())
       }
+      // 先重置再 hydrate：切换账号时若新账号本地没有数据（localStorage 无该 key），
+      // persist 插件的 hydrate 不会改动 state，残留的上一个账号会话会留在内存里，
+      // 随后 pull() 的「首次登录回写」会把残留数据误传到新账号（跨账号串数据）。
+      this.$reset()
       this.$hydrate()
       this.ensureSession()
     },

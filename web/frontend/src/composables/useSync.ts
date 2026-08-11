@@ -43,8 +43,12 @@ function createSync() {
         sessions.ensureSession()
         favorites.$patch({ favorites: data.favorites })
       } else {
-        // 首次登录该账号：把本地既有数据回写服务端（老用户迁移，不丢历史）
-        pushNow()
+        // 首次登录该账号：仅当本地确实存有本账号的实质数据（有消息或收藏）才回写服务端
+        // （老用户迁移，不丢历史）。防止把内存中残留的上一账号数据误传到新账号。
+        const hasLocalData =
+          sessions.sessions.some((s) => s.messages.length > 0) ||
+          favorites.favorites.length > 0
+        if (hasLocalData) pushNow()
       }
     } catch {
       /* 服务端不可达：降级用本地数据，不中断 */

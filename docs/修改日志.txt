@@ -300,3 +300,4 @@
 内容：设置面板精简与功能扩充——①删除三处说明文字（模型价格/能力小字、API Key 四行说明、底部 Auto 提示框），界面简洁化；②API Key 输入框占位符改为 Key 形式（sk-*******）；③设置面板分区重构为「问答偏好 / 模型与 API Key / 账户 / 关于」四区：新增 NLI 引用核验开关与自一致性采样次数（2/3/5，此前 store 有字段无界面）；新增修改密码（校验旧密码、重哈希、吊销该用户其他设备 Token，当前设备保持登录）；新增清空全部个人数据（二次确认，清会话/收藏/资料，保留账号与 API Key）；新增关于区块（账号/模型数/离线引擎/服务与法律库状态）
 涉及文件：web/backend/main.py, web/backend/schemas.py, web/backend/session_manager.py（新增 revoke_others）, web/backend/user_store.py（新增 change_password）, web/backend/user_data.py（新增 clear_user_data）, web/frontend/src/components/common/SettingsModal.vue（分区重构）, web/frontend/src/api/auth.ts, web/frontend/src/api/user.ts
 验证：后端单元自测（change_password/revoke_others/clear_user_data）+ 真实接口测试（旧密码错 400/新密码短 400/改密踢其他设备且当前保持/新密码登录/清空后数据为空且 Key 保留/未登录 401）+ 前端 npm run build 通过 + 服务重启为干净种子账号状态
+

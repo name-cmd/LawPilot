@@ -34,12 +34,14 @@ export const useFavoritesStore = defineStore('favorites', {
       return `${FAVORITES_PREFIX_V2}${auth.username || 'guest'}`
     },
 
-    /** 登录后加载该用户收藏：v1 迁移 + hydrate（与 sessions 同模式） */
+    /** 登录后加载该用户收藏：v1 迁移 + 清空旧账号内存数据 + hydrate（与 sessions 同模式） */
     loadForCurrentUser() {
       const auth = useAuthStore()
       if (auth.username) {
         migrateJson(`${FAVORITES_PREFIX_V1}${auth.username}`, this.storageKeyV2())
       }
+      // 与 sessions 同理：先重置，防止新账号无本地数据时残留上一个账号的收藏
+      this.$reset()
       this.$hydrate()
     },
 
