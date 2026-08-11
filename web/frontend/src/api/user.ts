@@ -36,3 +36,11 @@ export function saveUserProfile(token: string, patch: Partial<UserProfile>) {
     body: JSON.stringify({ token, ...patch }),
   })
 }
+
+/** 清空该账号全部个人数据（会话/收藏/资料；保留账号与自配 API Key） */
+export function clearUserData(token: string) {
+  return request<{ ok: boolean }>('/api/user/clear', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  })
+}

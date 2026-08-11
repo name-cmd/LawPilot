@@ -125,6 +125,12 @@ class AuthVerifyRequest(BaseModel):
     token: str = Field(..., min_length=1)
 
 
+class ChangePasswordRequest(BaseModel):
+    token: str = Field(..., min_length=1)
+    old_password: str = Field(..., min_length=1, max_length=128)
+    new_password: str = Field(..., min_length=1, max_length=128)
+
+
 class AuthVerifyResponse(BaseModel):
     valid: bool
     username: Optional[str] = None

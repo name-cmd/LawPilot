@@ -37,6 +37,7 @@ from src.guardrails.session_title import generate_session_title
 from web.backend.schemas import (
     AuthVerifyRequest,
     AuthVerifyResponse,
+    ChangePasswordRequest,
     ChatRequest,
     ChatResponse,
     ChatStreamRequest,
@@ -267,6 +268,22 @@ def logout(req: AuthVerifyRequest):
     return {"ok": True}
 
 
+@app.post("/api/auth/change-password")
+def change_password(req: ChangePasswordRequest):
+    """修改密码：校验旧密码 → 重新哈希 → 吊销该用户其他设备的 Token。"""
+    from web.backend.user_store import validate_password
+
+    username = _require_user(req)
+    if not _user_store.authenticate(username, req.old_password):
+        raise HTTPException(status_code=400, detail="原密码错误")
+    reason = validate_password(req.new_password)
+    if reason:
+        raise HTTPException(status_code=400, detail=reason)
+    _user_store.change_password(username, req.new_password)
+    revoked = _session_mgr.revoke_others(username, keep_token=req.token)
+    return {"ok": True, "revoked_devices": revoked}
+
+
 def _require_user(req: AuthVerifyRequest) -> str:
     """校验 Token，返回用户名；无效抛 401。"""
     username = _session_mgr.verify(req.token)
@@ -302,6 +319,14 @@ def save_user_data(req: UserDataSaveRequest):
 def fetch_user_profile(req: UserDataFetchRequest):
     username = _require_user(req)
     return UserProfileResponse(**_user_data.get_profile(username))
+
+
+@app.post("/api/user/clear")
+def clear_user_data(req: UserDataFetchRequest):
+    """清空该账号全部个人数据（会话/收藏/资料），保留账号与自配 API Key。"""
+    username = _require_user(req)
+    _user_data.clear_user_data(username)
+    return {"ok": True}
 
 
 @app.post("/api/user/profile/save", response_model=UserProfileResponse)

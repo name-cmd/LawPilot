@@ -64,6 +64,20 @@ class UserDataStore:
             self._cache[username] = data
             self._save(username, data)
 
+    def clear_user_data(self, username: str) -> None:
+        """清空该用户的会话/收藏/资料，保留 profile.api_key（账号与 Key 归注册表管）。
+
+        服务端数据清空后，前端 useSync 的防抖 watcher 会再推一次空状态（幂等，无害）。
+        """
+        with self._lock:
+            data = self._cache.get(username, self._load_raw(username))
+            api_key = (data.get("profile") or {}).get("api_key")
+            fresh = {"sessions": [], "favorites": [], "profile": {}}
+            if api_key:
+                fresh["profile"]["api_key"] = api_key
+            self._cache[username] = fresh
+            self._save(username, fresh)
+
     def get_profile(self, username: str) -> Dict[str, Any]:
         with self._lock:
             data = self._cache.get(username, self._load_raw(username))

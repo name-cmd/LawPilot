@@ -88,6 +88,23 @@ class SessionManager:
             if self._tokens.pop(token, None) is not None:
                 self._save()
 
+    def revoke_others(self, username: str, keep_token: str) -> int:
+        """吊销该用户除 keep_token 外的全部 Token（改密码后踢其他设备）。
+
+        返回吊销数量。多端共存的设计里仅此一处主动吊销（安全操作）。
+        """
+        with self._lock:
+            removed = [
+                t
+                for t, rec in self._tokens.items()
+                if rec.get("username") == username and t != keep_token
+            ]
+            for t in removed:
+                self._tokens.pop(t, None)
+            if removed:
+                self._save()
+            return len(removed)
+
     def active_count(self) -> int:
         with self._lock:
             return len(self._tokens)

@@ -168,6 +168,17 @@ class UserStore:
             user.api_key = (api_key or "").strip() or None
             self._save()
 
+    def change_password(self, username: str, new_password: str) -> None:
+        """修改密码：重新生成盐 + 哈希并落盘。"""
+        with self._lock:
+            user = self._users.get(username)
+            if not user:
+                return
+            h, s = hash_password(new_password)
+            user.password_hash = h
+            user.salt = s
+            self._save()
+
     def display_name(self, username: str) -> str:
         user = self._users.get(username)
         return user.display_name if user else username
