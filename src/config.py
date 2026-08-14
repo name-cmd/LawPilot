@@ -39,7 +39,12 @@ class Config:
     # 百炼 OpenAI 兼容接口地址（华北2北京地域）
     API_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     # 默认主模型：qwen3.7-plus（性价比高、256K 上下文；免费额度用尽可切 qwen3.6-plus-2026-04-02 快照版，额度独立）
-    API_MODEL = "qwen3.7-plus"
+    # 支持环境变量 API_MODEL 覆盖（.env 中设置，与 .env.example 说明保持一致）
+    API_MODEL = os.environ.get("API_MODEL", "qwen3.7-plus")
+    # 全局默认模型（Auto 跟随；可被前端设置面板传回的 global_model 覆盖）。
+    # 可选值：qwen3.7-plus / qwen-turbo / qwen3.7-max / deepseek-v4-flash-0731 /
+    #         deepseek-v4-pro / kimi-k2.6 / glm-5.2（详见 src/llm/model_registry.py）
+    DEFAULT_API_MODEL = os.environ.get("DEFAULT_API_MODEL", API_MODEL)
     # API Key 只从环境变量 / .env 读取，绝不硬编码（阿里云百炼控制台 → API-KEY 管理）
     API_KEY_ENV = "DASHSCOPE_API_KEY"
     # qwen3 系列默认开启思考模式（多输出推理 token、增加成本与延迟），显式关闭
@@ -100,5 +105,17 @@ class Config:
     TEMPERATURE_RANGE = [0.3, 0.5, 0.7, 0.9, 1.1]
     CONSISTENCY_THRESHOLD = 0.75
 
+    # ---- 智能体（Agent）----
+    AGENT_ENABLE_TOOLS = True            # 法律问答管线的工具调用开关（仅 API 引擎生效）
+    AGENT_MAX_TOOL_ROUNDS = 3            # 单次回答最大工具调用轮次（防死循环）
+    AGENT_DECISION_MAX_TOKENS = 512      # 每轮工具决策的最大生成 token
+    AGENT_TOOL_ARG_MAX_LEN = 100         # 工具参数长度上限（清洗）
+
     # NLI model (downloaded from HuggingFace at runtime)
     NLI_MODEL_NAME = str(BASE_DIR / "models" / "Erlangshen-Roberta-330M-NLI")
+
+    # ---- 多用户账号体系（阶段三：服务端会话管理）----
+    # Token 有效期（秒）：24 小时，每次校验通过自动续期（滑动过期）
+    SESSION_TTL_SEC = 86400
+    # 用户注册表 / Token 表 / 每用户数据 JSON 的存放目录（不入库，见 .gitignore）
+    USER_DATA_DIR = str(BASE_DIR / "data" / "users")

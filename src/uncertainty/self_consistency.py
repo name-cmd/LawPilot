@@ -27,6 +27,8 @@ class SelfConsistencyChecker:
         temperatures: List[float] = None,
         context_docs: List[str] = None,
         history: Optional[List[Dict[str, str]]] = None,
+        model_id: Optional[str] = None,
+        api_key: Optional[str] = None,
     ) -> Dict:
         """
         Sample n_samples responses and return a consistency/uncertainty report.
@@ -49,6 +51,8 @@ class SelfConsistencyChecker:
                 temperature=t,
                 context_docs=context_docs,
                 history=history,
+                model_id=model_id,  # 自一致性采样沿用主回答所用模型
+                api_key=api_key,    # 自一致性采样沿用主回答所用 API Key
             )
             for t in temperatures
         ]

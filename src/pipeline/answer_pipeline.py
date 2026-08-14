@@ -9,18 +9,24 @@ from typing import Dict, Generator, List, Optional, Tuple
 from langchain_core.documents import Document
 
 from src.config import Config
-from src.llm.qwen_model import QwenModel, get_system_prompt
+from src.llm.qwen_model import TOOL_GUIDANCE_SUFFIX, QwenModel, get_system_prompt
 from src.llm.rag_context import format_retrieved_articles
 from src.document_processing.document_context import format_user_documents
 from src.citation_verifier.citation_verifier import CitationVerifier
 from src.uncertainty.self_consistency import SelfConsistencyChecker
-from src.knowledge_base.retrieval_utils import article_key, format_article_record
+from src.knowledge_base.retrieval_utils import (
+    article_key,
+    format_article_record,
+    merge_unique_docs,
+)
 from src.pipeline.intent_router import IntentResult, classify_intent
 from src.pipeline.query_rewriter import (
     RewriteResult,
     is_retrieval_relevant,
     rewrite_for_retrieval,
 )
+from src.agents.task_scheduler import TaskDecision, classify_task
+from src.knowledge_base.law_validity import LawValidityService, build_validity_evidence
 
 
 _REGENERATE_PROMPT_SUFFIX = """
@@ -33,6 +39,14 @@ _FOCUS_REGEN_SUFFIX = """
 请围绕上述核心问题重新作答，不要仅因用户附带提及身份证/手机号就只回答证件扣押或隐私条款。
 保持【结论】【法律分析】【依据法条】结构。"""
 
+# 只有省略了主题、确实依赖上文的追问才把历史带入向量检索。把每个独立
+# 法律问题和上一轮问题直接拼接，会让高频词（如“行政复议”）压过当前问题。
+_CONTEXTUAL_FOLLOW_UP_RE = re.compile(
+    r"(?:上述|前述|该(?:行为|决定|机关|事项|条款|情形|法律)|"
+    r"这(?:个|种|项|部|条|类|一)|那(?:个|种|项|部|条|么|又)|其(?:中|他)|"
+    r"同样|分别|怎么办|怎么处理)"
+)
+
 _EMPTY_VERIFICATION = {
     "extracted_citations": [],
     "implicit_claims": [],
@@ -40,6 +54,11 @@ _EMPTY_VERIFICATION = {
     "summary": "非法律结构化回答，未执行引用核验",
     "validity_warnings": [],
 }
+
+# 无文档合同审查的礼貌引导文案：短路返回，零 LLM 调用（设计文档 §4.1/§9）
+_CONTRACT_GUIDANCE_MESSAGE = (
+    "请上传合同文件后再提问，我可为您审查试用期约定、工资、违约金等常见风险条款。"
+)
 
 
 @dataclass
@@ -59,6 +78,17 @@ class PipelineContext:
     use_rag: bool = True
     history: Optional[List[Dict[str, str]]] = None
     user_documents: Optional[List[Dict]] = None
+    # 用户选择的模型 id（"auto" 已在路由层解析为具体 id；None = 走引擎默认）
+    model_id: Optional[str] = None
+    # 用户自配 API Key（None = 回退服务端 .env Key）；随 ctx 传递，
+    # agent_loop / 流式生成 / 异步核验任务均可直接读取，全程同一个 Key
+    api_key: Optional[str] = None
+    # 任务调度结果（合同审查 / 时效查询 / 默认法律问答）
+    task: Optional[TaskDecision] = None
+    # 时效查询的确定性证据（任务类型为 validity_check 时非空）
+    validity_evidence: Optional[Dict] = None
+    # 短路文本：非空时生成阶段直接输出该文本（不调用 LLM），用于无文档合同审查引导
+    short_circuit_text: Optional[str] = None
 
 
 class AnswerPipeline:
@@ -86,6 +116,9 @@ class AnswerPipeline:
         max_regeneration: int = None,
         history: Optional[List[Dict[str, str]]] = None,
         user_documents: Optional[List[Dict]] = None,
+        model_id: Optional[str] = None,
+        agent_tools: bool = False,
+        api_key: Optional[str] = None,
     ) -> Dict:
         max_regeneration = (
             max_regeneration
@@ -95,7 +128,7 @@ class AnswerPipeline:
         user_documents = self._truncate_user_documents(user_documents)
 
         intent = (
-            classify_intent(query, history)
+            classify_intent(query, history, user_documents=user_documents)
             if Config.ENABLE_INTENT_ROUTING
             else IntentResult("legal_qa", 1.0, "意图路由已关闭")
         )
@@ -105,7 +138,19 @@ class AnswerPipeline:
                 query=query,
                 intent=intent,
                 history=history,
+                user_documents=user_documents,
+                model_id=model_id,
+                api_key=api_key,
             )
+
+        task = classify_task(query, intent, user_documents)
+
+        if task.task_type == "contract_review" and not user_documents:
+            # 无文档的合同审查：不调用 LLM，直接返回引导上传文案（设计文档 §4.1/§9）
+            return self._run_contract_guidance(query, intent, task, history, model_id)
+
+        if task.task_type == "validity_check":
+            return self._run_validity(query, intent, task, history, model_id, api_key=api_key)
 
         rewrite = (
             rewrite_for_retrieval(query)
@@ -141,18 +186,62 @@ class AnswerPipeline:
             rag_block=rag_block,
             user_documents=user_documents,
         )
-        system_prompt = get_system_prompt("legal_qa")
-
-        response = self.model.generate(
-            generation_query,
-            system_prompt=system_prompt,
-            context_docs=context_docs,
-            history=history,
-            intent_hint=intent_hint,
+        system_prompt = get_system_prompt(
+            "contract_review" if task.task_type == "contract_review" else "legal_qa"
         )
 
+        # 智能体工具模式：开关打开 + 模型支持函数调用 + 任务为法律问答时启用。
+        # AgentToolLoop 在函数内惰性导入：agent_loop 顶部会回引本模块的
+        # PipelineContext，顶层导入会造成循环导入（import 阶段类尚未定义）。
+        use_tools = (
+            agent_tools
+            and Config.AGENT_ENABLE_TOOLS
+            and self.model.supports_tools(model_id)
+            and (task is None or task.task_type == "legal_qa")
+        )
+        tool_trace = []
+        if use_tools:
+            from src.agents.agent_loop import AgentToolLoop
+
+            # 工具模式专用提示词段：仅此分支注入，非工具路径不携带
+            system_prompt = system_prompt + TOOL_GUIDANCE_SUFFIX
+            loop = AgentToolLoop(
+                self.model, self.store,
+                validity=(self.verifier.validity if self.verifier else None),
+            )
+            temp_ctx = PipelineContext(
+                query=query, intent=intent, task=task,
+                generation_query=generation_query,
+                intent_hint=intent_hint,
+                context_docs=context_docs,
+                system_prompt=system_prompt,
+                history=history,
+                user_documents=user_documents,
+                model_id=model_id,
+                api_key=api_key,
+            )
+            response, trace_steps = loop.run(temp_ctx, model_id=model_id)
+            tool_trace = [s.to_dict() for s in trace_steps]
+            if loop.found_docs:
+                retrieved_docs = merge_unique_docs(retrieved_docs, loop.found_docs)
+                rag_used = True
+        else:
+            response = self.model.generate(
+                generation_query,
+                system_prompt=system_prompt,
+                context_docs=context_docs,
+                history=history,
+                intent_hint=intent_hint,
+                model_id=model_id,
+                api_key=api_key,
+            )
+
         verification = (
-            self.verifier.verify(response, retrieved_docs=retrieved_docs)
+            self.verifier.verify(
+                response,
+                retrieved_docs=retrieved_docs,
+                user_documents=user_documents,
+            )
             if rag_used
             else dict(_EMPTY_VERIFICATION)
         )
@@ -174,9 +263,13 @@ class AnswerPipeline:
                 context_docs=context_docs,
                 history=history,
                 intent_hint=intent_hint,
+                model_id=model_id,
+                api_key=api_key,
             )
             verification = self.verifier.verify(
-                response, retrieved_docs=retrieved_docs
+                response,
+                retrieved_docs=retrieved_docs,
+                user_documents=user_documents,
             )
             attempts += 1
 
@@ -190,9 +283,13 @@ class AnswerPipeline:
                 context_docs=context_docs,
                 history=history,
                 intent_hint=intent_hint,
+                model_id=model_id,
+                api_key=api_key,
             )
             verification = self.verifier.verify(
-                response, retrieved_docs=retrieved_docs
+                response,
+                retrieved_docs=retrieved_docs,
+                user_documents=user_documents,
             )
 
         consistency_report = None
@@ -203,6 +300,8 @@ class AnswerPipeline:
                 temperatures=Config.TEMPERATURE_RANGE[:n_consistency_samples],
                 context_docs=context_docs,
                 history=history,
+                model_id=model_id,
+                api_key=api_key,
             )
 
         trust_report = None
@@ -228,6 +327,8 @@ class AnswerPipeline:
             "intent": intent.to_dict(),
             "query_rewrite": rewrite.to_dict(),
             "rag_used": rag_used,
+            "task": task.to_dict() if task else None,
+            "tool_trace": tool_trace,
         }
 
     def prepare_context(
@@ -236,23 +337,82 @@ class AnswerPipeline:
         use_rag: bool = True,
         history: Optional[List[Dict[str, str]]] = None,
         user_documents: Optional[List[Dict]] = None,
+        model_id: Optional[str] = None,
+        api_key: Optional[str] = None,
     ) -> PipelineContext:
         user_documents = self._truncate_user_documents(user_documents)
 
         intent = (
-            classify_intent(query, history)
+            classify_intent(query, history, user_documents=user_documents)
             if Config.ENABLE_INTENT_ROUTING
             else IntentResult("legal_qa", 1.0, "意图路由已关闭")
         )
 
-        if intent.intent in ("greeting", "general_non_legal"):
+        if intent.intent == "greeting":
+            # 寒暄：不需要文档内容，保持原样（不注入、不用文档分析提示词）
             return PipelineContext(
                 query=query,
                 intent=intent,
                 history=history,
                 use_rag=False,
-                system_prompt=get_system_prompt(intent.intent),
+                system_prompt=get_system_prompt("greeting"),
                 user_documents=user_documents,
+                model_id=model_id,
+                api_key=api_key,
+            )
+
+        if intent.intent == "general_non_legal":
+            # 非法律文档分析：注入文档全文（此前 context_docs=None 丢弃文档，
+            # 模型读不到——「文档读不到」问题的根源结构），提示词用文档分析版
+            return PipelineContext(
+                query=query,
+                intent=intent,
+                history=history,
+                use_rag=False,
+                system_prompt=get_system_prompt(
+                    "general_non_legal", document_mode=bool(user_documents)
+                ),
+                context_docs=self._build_context_docs(user_documents=user_documents),
+                user_documents=user_documents,
+                model_id=model_id,
+                api_key=api_key,
+            )
+
+        task = classify_task(query, intent, user_documents)
+
+        # 无文档的合同审查：短路返回引导文案（SSE 流式直接输出，零 LLM 调用）
+        if task.task_type == "contract_review" and not user_documents:
+            return PipelineContext(
+                query=query,
+                intent=intent,
+                task=task,
+                history=history,
+                use_rag=False,
+                system_prompt=get_system_prompt("greeting"),
+                generation_query=_CONTRACT_GUIDANCE_MESSAGE,
+                short_circuit_text=_CONTRACT_GUIDANCE_MESSAGE,
+                user_documents=user_documents,
+                model_id=model_id,
+                api_key=api_key,
+            )
+
+        # 时效查询快路径：直查注册表 → 确定性证据 + 模型润色（不检索、不核验）
+        if task.task_type == "validity_check":
+            validity = self.verifier.validity if self.verifier else LawValidityService()
+            evidence = build_validity_evidence(task.law_name, validity)
+            return PipelineContext(
+                query=query,
+                intent=intent,
+                task=task,
+                history=history,
+                use_rag=False,
+                system_prompt=get_system_prompt("validity_check"),
+                generation_query=query,
+                context_docs=[evidence["text"]],
+                validity_evidence=evidence,
+                user_documents=user_documents,
+                model_id=model_id,
+                api_key=api_key,
             )
 
         rewrite = (
@@ -293,6 +453,7 @@ class AnswerPipeline:
         return PipelineContext(
             query=query,
             intent=intent,
+            task=task,
             rewrite=rewrite,
             retrieved_docs=retrieved_docs,
             retrieval_scores=retrieval_scores,
@@ -301,21 +462,32 @@ class AnswerPipeline:
             generation_query=generation_query,
             intent_hint=intent_hint,
             context_docs=context_docs,
-            system_prompt=get_system_prompt("legal_qa"),
+            system_prompt=get_system_prompt(
+                "contract_review" if task.task_type == "contract_review" else "legal_qa"
+            ),
             use_rag=use_rag,
             history=history,
             user_documents=user_documents,
+            model_id=model_id,
+            api_key=api_key,
         )
 
     def generate_answer_stream(
         self, ctx: PipelineContext
     ) -> Generator[str, None, None]:
+        # 短路文本（无文档合同审查引导）：直接输出，不调用模型
+        if ctx.short_circuit_text:
+            yield ctx.short_circuit_text
+            return
+
         if ctx.intent.intent in ("greeting", "general_non_legal"):
             yield from self.model.generate_stream(
                 ctx.query,
                 system_prompt=ctx.system_prompt,
-                context_docs=None,
+                context_docs=ctx.context_docs,
                 history=ctx.history,
+                model_id=ctx.model_id,
+                api_key=ctx.api_key,
             )
             return
 
@@ -325,6 +497,8 @@ class AnswerPipeline:
             context_docs=ctx.context_docs,
             history=ctx.history,
             intent_hint=ctx.intent_hint,
+            model_id=ctx.model_id,
+            api_key=ctx.api_key,
         )
 
     def run_fast(
@@ -333,6 +507,8 @@ class AnswerPipeline:
         use_rag: bool = True,
         history: Optional[List[Dict[str, str]]] = None,
         user_documents: Optional[List[Dict]] = None,
+        model_id: Optional[str] = None,
+        api_key: Optional[str] = None,
     ) -> Tuple[PipelineContext, Optional[Dict]]:
         """Prepare context and metadata without LLM generation or verification."""
         ctx = self.prepare_context(
@@ -340,6 +516,8 @@ class AnswerPipeline:
             use_rag=use_rag,
             history=history,
             user_documents=user_documents,
+            model_id=model_id,
+            api_key=api_key,
         )
 
         if ctx.intent.intent in ("greeting", "general_non_legal"):
@@ -358,6 +536,8 @@ class AnswerPipeline:
                 "summary": "引用核验进行中…",
             },
             "verification_status": "pending",
+            "task": ctx.task.to_dict() if ctx.task else None,
+            "validity_evidence": ctx.validity_evidence,
         }
         return ctx, meta
 
@@ -367,8 +547,12 @@ class AnswerPipeline:
         response: str,
         enable_consistency: bool = False,
         n_consistency_samples: int = 2,
+        api_key: Optional[str] = None,
     ) -> Dict:
-        """Full citation verification and trust scoring (no regeneration)."""
+        """Full citation verification and trust scoring (no regeneration).
+
+        api_key 缺省时沿用 ctx.api_key（异步核验任务从 ctx 携带用户 Key）。
+        """
         if ctx.intent.intent in ("greeting", "general_non_legal"):
             return {
                 "citation_verification": dict(_EMPTY_VERIFICATION),
@@ -379,7 +563,11 @@ class AnswerPipeline:
             }
 
         verification = (
-            self.verifier.verify(response, retrieved_docs=ctx.retrieved_docs)
+            self.verifier.verify(
+                response,
+                retrieved_docs=ctx.retrieved_docs,
+                user_documents=ctx.user_documents,
+            )
             if ctx.rag_used
             else dict(_EMPTY_VERIFICATION)
         )
@@ -392,6 +580,8 @@ class AnswerPipeline:
                 temperatures=Config.TEMPERATURE_RANGE[:n_consistency_samples],
                 context_docs=ctx.context_docs,
                 history=ctx.history,
+                model_id=ctx.model_id,
+                api_key=api_key if api_key is not None else ctx.api_key,
             )
 
         trust_report = None
@@ -418,13 +608,26 @@ class AnswerPipeline:
         query: str,
         intent: IntentResult,
         history: Optional[List[Dict[str, str]]],
+        user_documents: Optional[List[Dict]] = None,
+        model_id: Optional[str] = None,
+        api_key: Optional[str] = None,
     ) -> Dict:
-        system_prompt = get_system_prompt(intent.intent)
+        # 非法律文档分析（general + 携带文档）：注入文档全文 + 文档分析提示词；
+        # 寒暄/普通非法律问题不注入文档，保持原样
+        document_mode = intent.intent == "general_non_legal" and bool(user_documents)
+        context_docs = (
+            self._build_context_docs(user_documents=user_documents)
+            if document_mode
+            else None
+        )
+        system_prompt = get_system_prompt(intent.intent, document_mode=document_mode)
         response = self.model.generate(
             query,
             system_prompt=system_prompt,
-            context_docs=None,
+            context_docs=context_docs,
             history=history,
+            model_id=model_id,
+            api_key=api_key,
         )
         trust_report = None
         return {
@@ -441,20 +644,80 @@ class AnswerPipeline:
             "rag_used": False,
         }
 
+    def _run_contract_guidance(
+        self,
+        query: str,
+        intent: IntentResult,
+        task: TaskDecision,
+        history: Optional[List[Dict[str, str]]] = None,
+        model_id: Optional[str] = None,
+    ) -> Dict:
+        """无文档合同审查：零 LLM 调用，返回固定引导文案（与 _run_non_legal 同构）。"""
+        return {
+            "query": query,
+            "answer": _CONTRACT_GUIDANCE_MESSAGE,
+            "use_rag": False,
+            "retrieved_articles": [],
+            "citation_verification": dict(_EMPTY_VERIFICATION),
+            "consistency": None,
+            "trust": None,
+            "regeneration_attempts": 0,
+            "intent": intent.to_dict(),
+            "query_rewrite": None,
+            "rag_used": False,
+            "task": task.to_dict(),
+        }
+
+    def _run_validity(
+        self,
+        query: str,
+        intent: IntentResult,
+        task: TaskDecision,
+        history: Optional[List[Dict[str, str]]] = None,
+        model_id: Optional[str] = None,
+        api_key: Optional[str] = None,
+    ) -> Dict:
+        validity = self.verifier.validity if self.verifier else LawValidityService()
+        evidence = build_validity_evidence(task.law_name, validity)
+        response = self.model.generate(
+            query,
+            system_prompt=get_system_prompt("validity_check"),
+            context_docs=[evidence["text"]],
+            history=history,
+            model_id=model_id,
+            api_key=api_key,
+        )
+        return {
+            "query": query,
+            "answer": response,
+            "use_rag": False,
+            "retrieved_articles": [],
+            "citation_verification": dict(_EMPTY_VERIFICATION),
+            "consistency": None,
+            "trust": None,
+            "regeneration_attempts": 0,
+            "intent": intent.to_dict(),
+            "query_rewrite": None,
+            "rag_used": False,
+            "task": task.to_dict(),
+            "validity_evidence": evidence,
+        }
+
     def _retrieve_articles(
         self,
         rewrite: RewriteResult,
         history: Optional[List[Dict[str, str]]],
     ) -> Tuple[List[Document], List[float], bool]:
         """Multi-query retrieval with relevance threshold."""
-        best: Dict[Tuple[str, str], Tuple[Document, float]] = {}
         min_rel = Config.RETRIEVAL_MIN_RELEVANCE
+        per_query: List[List[Tuple[Document, float]]] = []
 
         for rq in rewrite.retrieval_queries:
             combined = self._build_retrieval_query(rq, history)
             scored = self.store.similarity_search_unique(
                 combined, k=Config.TOP_K_RETRIEVAL
             )
+            best: Dict[Tuple[str, str], Tuple[Document, float]] = {}
             for doc, distance in scored:
                 if not is_retrieval_relevant(distance, min_rel):
                     continue
@@ -463,14 +726,42 @@ class AnswerPipeline:
                     continue
                 if key not in best or distance < best[key][1]:
                     best[key] = (doc, distance)
+            per_query.append(sorted(best.values(), key=lambda x: x[1]))
 
-        if not best:
+        ranked = self._merge_query_results(per_query, Config.TOP_K_RETRIEVAL)
+        if not ranked:
             return [], [], False
 
-        ranked = sorted(best.values(), key=lambda x: x[1])[: Config.TOP_K_RETRIEVAL]
         docs = [doc for doc, _ in ranked]
         scores = [dist for _, dist in ranked]
         return docs, scores, True
+
+    @staticmethod
+    def _merge_query_results(
+        per_query: List[List[Tuple[Document, float]]],
+        k: int,
+    ) -> List[Tuple[Document, float]]:
+        """多查询结果合并：主查询（用户原话改写）优先，扩展查询按序补位。
+
+        修复（2026-08-09）：「离婚冷静期是多长时间？」经扩展查询
+        「离婚 夫妻共同财产 子女抚养」命中财产分割条款，相关度反而高于用户
+        原话命中的冷静期条款（民法典第1077条），按相关度全局排序会把用户
+        真正关心的条文挤出 top-k，导致模型「检索不到法条依据」。
+        改为逐查询按序取位：主查询结果优先，扩展查询只补剩余空位，
+        并按（法律名, 条号）跨查询去重。
+        """
+        merged: List[Tuple[Document, float]] = []
+        taken = set()
+        for lst in per_query:
+            for doc, distance in lst:
+                key = article_key(doc)
+                if key in taken:
+                    continue
+                taken.add(key)
+                merged.append((doc, distance))
+                if len(merged) >= k:
+                    return merged
+        return merged
 
     @staticmethod
     def _build_context_docs(
@@ -541,7 +832,14 @@ class AnswerPipeline:
     def _build_retrieval_query(
         query: str, history: Optional[List[Dict[str, str]]]
     ) -> str:
-        if not history:
+        """Keep standalone questions isolated; carry history only for follow-ups.
+
+        Conversation history is still supplied to the answer model.  This rule
+        applies only to vector retrieval, where concatenating unrelated previous
+        questions can replace the current question's top-k legal basis.
+        """
+        query = (query or "").strip()
+        if not history or not _CONTEXTUAL_FOLLOW_UP_RE.search(query):
             return query
         recent_user = [
             m["content"] for m in history if m.get("role") == "user"

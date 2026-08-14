@@ -6,6 +6,7 @@ Modes:
   full     - RAG + citation verification + trust scoring
   rag      - RAG only (no regeneration)
   no_rag   - plain LLM without retrieval
+  agent    - full pipeline + agent tool calling
 
 Usage:
     python scripts/run_legal_trust_benchmark.py --mode full
@@ -13,6 +14,7 @@ Usage:
     python scripts/run_legal_trust_benchmark.py --dataset legal_safety --mode full
 """
 import argparse
+import time
 import sys
 from pathlib import Path
 
@@ -68,22 +70,28 @@ def run(args) -> dict:
     cite_hits = 0
     safety_ok = 0
     trust_scores = []
+    use_tools = args.mode == "agent"
 
     for item in data:
         prompt = item["prompt"]
         if args.mock:
+            elapsed_ms = 0
+            out = {}
             response = _mock_answer(item)
             use_rag = args.mode != "no_rag"
             verification = {"overall_citation_score": 0.85 if _citation_hit(response, item) else 0.4, "extracted_citations": []}
             trust = scorer.score(prompt, response, verification, None)
         else:
             use_rag = args.mode != "no_rag"
+            t0 = time.perf_counter()
             out = pipeline.run(
                 prompt,
                 use_rag=use_rag,
                 enable_consistency=False,
                 max_regeneration=0 if args.mode == "rag" else Config.MAX_REGENERATION_ATTEMPTS,
+                agent_tools=use_tools,
             )
+            elapsed_ms = round((time.perf_counter() - t0) * 1000, 1)
             response = out["answer"]
             verification = out["citation_verification"]
             trust = out["trust"]
@@ -98,29 +106,34 @@ def run(args) -> dict:
             if _citation_hit(response, item):
                 cite_hits += 1
 
-        trust_scores.append(trust["overall_score"])
+        trust_scores.append((trust or {}).get("overall_score"))
         rows.append({
             "id": item.get("id"),
             "prompt": prompt,
             "response": response[:500],
-            "trust_overall": trust["overall_score"],
-            "trust_dimensions": trust["dimensions"],
+            "trust_overall": (trust or {}).get("overall_score"),
+            "trust_dimensions": (trust or {}).get("dimensions"),
             "citation_score": verification.get("overall_citation_score"),
+            "tool_call_count": len(out.get("tool_trace") or []) if not args.mock else 0,
+            "elapsed_ms": elapsed_ms if not args.mock else 0,
         })
 
     n = len(data)
+    valid_scores = [s for s in trust_scores if s is not None]
     summary = {
         "mode": args.mode,
         "dataset": args.dataset,
         "mock": args.mock,
         "count": n,
-        "avg_trust_score": round(sum(trust_scores) / n, 2) if n else 0,
+        "avg_trust_score": round(sum(valid_scores) / len(valid_scores), 2) if valid_scores else 0,
         "avg_radar": _avg_radar(rows),
     }
     if args.dataset == "legal_safety":
         summary["safety_accuracy"] = round(safety_ok / n, 4) if n else 0
     else:
         summary["gold_citation_recall"] = round(cite_hits / n, 4) if n else 0
+    if args.mode == "agent":
+        summary["avg_tool_calls"] = round(sum(r["tool_call_count"] for r in rows) / n, 2) if n else 0
 
     report = {"summary": summary, "details": rows}
     out_path = args.output or str(
@@ -133,19 +146,20 @@ def run(args) -> dict:
 
 
 def _avg_radar(rows: list) -> dict:
-    if not rows:
+    dims = [r.get("trust_dimensions") for r in rows if r.get("trust_dimensions")]
+    if not dims:
         return {}
-    keys = rows[0].get("trust_dimensions", {}).keys()
+    keys = dims[0].keys()
     out = {}
     for k in keys:
-        vals = [r["trust_dimensions"][k] for r in rows if k in r.get("trust_dimensions", {})]
+        vals = [d[k] for d in dims if k in d]
         out[k] = round(sum(vals) / len(vals), 2) if vals else 0
     return out
 
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--mode", choices=["full", "rag", "no_rag"], default="full")
+    p.add_argument("--mode", choices=["full", "rag", "no_rag", "agent"], default="full")
     p.add_argument("--dataset", default="legal_qa_gold")
     p.add_argument("--db-dir", default=Config.LAW_DB_DIR)
     p.add_argument("--mock", action="store_true")

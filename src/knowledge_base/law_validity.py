@@ -157,3 +157,31 @@ class LawValidityService:
                 seen.add(msg)
                 warnings.append(msg)
         return warnings
+
+
+def build_validity_evidence(law_name: str, validity: "LawValidityService") -> Dict:
+    """构造时效查询的确定性证据块（供模型润色 + 前端溯源展示）。
+
+    核心事实（废止日期、替代法律）只来自注册表，模型不得编造。
+    """
+    result = validity.check_citation(law_name, "")
+    if result.effective:
+        return {
+            "law_name": law_name,
+            "effective": True,
+            "status": "effective",
+            "text": f"《{law_name}》现行有效。",
+        }
+    msg = f"《{law_name}》已废止"
+    if result.repeal_date:
+        msg += f"（{result.repeal_date}）"
+    if result.superseded_by:
+        msg += f"，替代法律：《{result.superseded_by}》"
+    return {
+        "law_name": law_name,
+        "effective": False,
+        "status": result.status,
+        "repeal_date": result.repeal_date,
+        "superseded_by": result.superseded_by,
+        "text": msg,
+    }

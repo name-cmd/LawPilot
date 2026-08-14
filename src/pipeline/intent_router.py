@@ -16,6 +16,14 @@ _LEGAL_KEYWORDS = (
     "交通事故", "肇事", "维权", "违法", "犯罪", "刑法", "民法", "宪法",
     "法院", "检察院", "律师", "调解", "判决", "裁定", "执行", "拘留",
     "罚款", "责任", "义务", "权利", "证件", "身份证", "押金", "违约金",
+    # 2026-08-09 补充：民间借贷类（「民间借贷利率的合法上限」此前漏判为
+    # 非法律问题，导致不套三段式、不走 RAG）
+    "借贷", "借款", "贷款", "利率", "利息", "债务", "欠款", "担保", "抵押",
+    "定金", "彩礼", "遗嘱", "遗产",
+    # 2026-08-10 补充：具体法律名（配合任务调度器时效查询——注册表 9 部废止法律
+    # 中「婚姻法」「专利法」「收养法」「物权法」此前漏判为 general_non_legal /
+    # 简短寒暄，导致时效查询在真实调用链上不可达）
+    "婚姻", "专利", "收养", "物权",
 )
 
 _NON_LEGAL_RE = re.compile(
@@ -44,6 +52,15 @@ def _has_legal_keywords(text: str) -> bool:
     return any(kw in text for kw in _LEGAL_KEYWORDS)
 
 
+def has_legal_keywords(text: str) -> bool:
+    """公开包装：文档分析场景判定复用同一关键词表（answer_pipeline 导入）。
+
+    约定与意图路由完全一致——文本中出现任一法律关键词即视为涉法，
+    避免两处关键词逻辑各写一份导致判定漂移。
+    """
+    return _has_legal_keywords(text)
+
+
 def _is_greeting(text: str) -> bool:
     return bool(_GREETING_RE.match(text.strip()))
 
@@ -66,8 +83,16 @@ def _history_has_legal_context(history: Optional[List[Dict[str, str]]]) -> bool:
 def classify_intent(
     query: str,
     history: Optional[List[Dict[str, str]]] = None,
+    user_documents: Optional[List[Dict]] = None,
 ) -> IntentResult:
-    """Classify user query before RAG / generation."""
+    """Classify user query before RAG / generation.
+
+    是否法律问题以「提问」为准，文档只是内容素材：
+    - 提问含法律关键词 → legal_qa（无论是否携带文档）；
+    - 提问无法律关键词但携带文档 → general_non_legal（文档分析模式，
+      answer_pipeline 负责注入文档全文，此处只决定路由）。
+    文档文本不再参与关键词扫描——技术日志提到「法条」等词不应被判为涉法文档。
+    """
     text = (query or "").strip()
     if not text:
         return IntentResult("general_non_legal", 1.0, "空输入")
@@ -80,6 +105,12 @@ def classify_intent(
 
     if _is_non_legal(text):
         return IntentResult("general_non_legal", 0.88, "非法律领域问题")
+
+    if user_documents:
+        # 提问无法律关键词 + 携带文档：按非法律文档分析处理（注入文档与提示词
+        # 由 answer_pipeline 负责）。优先于历史上下文延续——文档分析请求不应
+        # 因之前问过法律问题而被判为法律问答。
+        return IntentResult("general_non_legal", 0.85, "非法律文档分析请求")
 
     if _history_has_legal_context(history):
         return IntentResult("legal_qa", 0.75, "法律对话上下文延续")

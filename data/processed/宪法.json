@@ -2096,5 +2096,13 @@
       "hierarchy_text": "序言 / 第四章 国旗、国歌、国徽、首都",
       "content": "中华人民共和国首都是北京。"
     }
-  ]
+  ],
+  "full_name": "中华人民共和国宪法",
+  "status": "effective",
+  "category": "宪法",
+  "issue_org": "全国人民代表大会",
+  "issue_date": "2018-03-11",
+  "law_version": "2018年修正文本",
+  "source": "https://flk.npc.gov.cn/detail?detailType=constitution&id=2c909fdd678bf17901678bf5a483004b",
+  "has_interpretation": false
 }

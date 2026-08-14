@@ -1,7 +1,7 @@
 {
   "title": "劳动法",
   "law_name": "劳动法",
-  "effective_date": "2018-12-19",
+  "effective_date": "2018-12-29",
   "source_file": "劳动法.md",
   "article_count": 107,
   "hierarchy_schema": [
@@ -1399,5 +1399,13 @@
       "hierarchy_text": "第十三章 附则",
       "content": "本法自1995年1月1日起施行。"
     }
-  ]
+  ],
+  "full_name": "中华人民共和国劳动法",
+  "status": "effective",
+  "category": "劳动法律",
+  "issue_org": "全国人民代表大会常务委员会",
+  "issue_date": "2018-12-29",
+  "law_version": "2018年修正",
+  "source": "https://flk.npc.gov.cn/",
+  "has_interpretation": true
 }
