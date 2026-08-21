@@ -5,7 +5,7 @@ from modelscope import snapshot_download
 model_id = "BAAI/bge-base-zh-v1.5"
 
 # 2. 直接指定你最终想要的绝对路径（和 Qwen 结构完全一致）
-target_dir = "./models/bge-base-zh-v1.5"
+target_dir = "./models1/bge-base-zh-v1.5"
 
 print("正在下载 BGE Embedding 模型到指定目录...")
 
