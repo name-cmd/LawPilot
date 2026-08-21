@@ -16,6 +16,10 @@ law_db/
 .idea/
 .vscode/
 
+# Jupyter automatic backups must never enter the legal-data pipeline.
+.ipynb_checkpoints/
+*-checkpoint.md
+
 # 依赖
 node_modules/
 

@@ -14,10 +14,10 @@ from .law_parser import _parse_num
 
 # **第一条** or plain 第一条
 _ARTICLE_BOLD_RE = re.compile(
-    r"^\*\*第([一二三四五六七八九十百千零\d]+)条\*\*\s*(.*)$"
+    r"^\*\*第((?:[一二三四五六七八九十百千零\d]+条之[一二三四五六七八九十百千零\d]+)|(?:[一二三四五六七八九十百千零\d]+)(?=条))条?\*\*\s*(.*)$"
 )
 _ARTICLE_PLAIN_RE = re.compile(
-    r"^第([一二三四五六七八九十百千零\d]+)条\s*(.*)$"
+    r"^第((?:[一二三四五六七八九十百千零\d]+条之[一二三四五六七八九十百千零\d]+)|(?:[一二三四五六七八九十百千零\d]+)(?=条))条?\s*(.*)$"
 )
 _HEADER_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 _TOC_LINK_RE = re.compile(r"^\[.+\]\(#.+\)\s*$")
@@ -60,6 +60,8 @@ def law_name_from_source(source_name: str) -> str:
 
 def _format_article_number(num_raw: str) -> str:
     s = num_raw.strip().replace("第", "").replace("条", "")
+    if "条之" in num_raw:
+        return f"第{num_raw.strip().replace('第', '')}"
     return f"第{s}条"
 
 
@@ -169,8 +171,11 @@ def _article_record(
     section: str,
 ) -> Dict:
     path = _hierarchy_path(part, sub_part, chapter, section)
+    article_number = _format_article_number(num_raw)
+    # ``第一百三十三条之一`` must remain distinguishable from its parent
+    # article; otherwise vector-store metadata deduplicates both as article 133.
     return {
-        "article_number": _format_article_number(num_raw),
+        "article_number": article_number,
         "article_num_int": _parse_num(num_raw),
         "part": part,
         "sub_part": sub_part,
@@ -182,7 +187,11 @@ def _article_record(
     }
 
 
-def parse_markdown_law(text: str, source_name: str = "") -> Dict:
+def parse_markdown_law(
+    text: str,
+    source_name: str = "",
+    registry_entry: Optional[Dict] = None,
+) -> Dict:
     """
     Parse one Markdown law file into a JSON-serialisable dict.
 
@@ -262,7 +271,7 @@ def parse_markdown_law(text: str, source_name: str = "") -> Dict:
 
     schema = _infer_hierarchy_schema(articles)
 
-    return {
+    result = {
         "title": law_name,
         "law_name": law_name,
         "effective_date": effective_date,
@@ -271,11 +280,26 @@ def parse_markdown_law(text: str, source_name: str = "") -> Dict:
         "hierarchy_schema": schema,
         "articles": articles,
     }
+    if registry_entry:
+        # Keep source/version/effectiveness facts alongside the parsed text so
+        # every generated JSON is independently auditable.
+        for key in (
+            "full_name", "status", "category", "issue_org", "issue_date",
+            "effective_date", "law_version", "source", "has_interpretation",
+            "repeal_date", "superseded_by", "note", "doc_type", "interpretation_of",
+        ):
+            if key in registry_entry:
+                result[key] = registry_entry[key]
+    return result
 
 
-def convert_md_file(md_path: Path, output_dir: Path) -> Path:
+def convert_md_file(
+    md_path: Path, output_dir: Path, registry: Optional[Dict[str, Dict]] = None
+) -> Path:
     text = md_path.read_text(encoding="utf-8")
-    data = parse_markdown_law(text, source_name=md_path.name)
+    data = parse_markdown_law(
+        text, source_name=md_path.name, registry_entry=(registry or {}).get(md_path.stem)
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
     out_path = output_dir / f"{md_path.stem}.json"
     with open(out_path, "w", encoding="utf-8") as f:
@@ -288,14 +312,24 @@ def convert_md_directory(
     output_dir: Path,
     *,
     recursive: bool = True,
+    registry: Optional[Dict[str, Dict]] = None,
 ) -> List[Tuple[Path, Path, int]]:
     pattern = "**/*.md" if recursive else "*.md"
-    md_files = sorted(input_dir.glob(pattern))
+    # Jupyter creates hidden checkpoint copies beside source files.  They are
+    # editor artefacts, not independent laws, and must not pollute the KB.
+    md_files = sorted(
+        p for p in input_dir.glob(pattern)
+        if ".ipynb_checkpoints" not in p.parts
+        and not p.name.endswith("-checkpoint.md")
+    )
     results: List[Tuple[Path, Path, int]] = []
 
     for md_path in md_files:
         text = md_path.read_text(encoding="utf-8")
-        data = parse_markdown_law(text, source_name=md_path.name)
+        data = parse_markdown_law(
+            text, source_name=md_path.name,
+            registry_entry=(registry or {}).get(md_path.stem),
+        )
         output_dir.mkdir(parents=True, exist_ok=True)
         out_path = output_dir / f"{md_path.stem}.json"
         with open(out_path, "w", encoding="utf-8") as f:

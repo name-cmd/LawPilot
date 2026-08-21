@@ -39,6 +39,14 @@ _FOCUS_REGEN_SUFFIX = """
 请围绕上述核心问题重新作答，不要仅因用户附带提及身份证/手机号就只回答证件扣押或隐私条款。
 保持【结论】【法律分析】【依据法条】结构。"""
 
+# 只有省略了主题、确实依赖上文的追问才把历史带入向量检索。把每个独立
+# 法律问题和上一轮问题直接拼接，会让高频词（如“行政复议”）压过当前问题。
+_CONTEXTUAL_FOLLOW_UP_RE = re.compile(
+    r"(?:上述|前述|该(?:行为|决定|机关|事项|条款|情形|法律)|"
+    r"这(?:个|种|项|部|条|类|一)|那(?:个|种|项|部|条|么|又)|其(?:中|他)|"
+    r"同样|分别|怎么办|怎么处理)"
+)
+
 _EMPTY_VERIFICATION = {
     "extracted_citations": [],
     "implicit_claims": [],
@@ -824,7 +832,14 @@ class AnswerPipeline:
     def _build_retrieval_query(
         query: str, history: Optional[List[Dict[str, str]]]
     ) -> str:
-        if not history:
+        """Keep standalone questions isolated; carry history only for follow-ups.
+
+        Conversation history is still supplied to the answer model.  This rule
+        applies only to vector retrieval, where concatenating unrelated previous
+        questions can replace the current question's top-k legal basis.
+        """
+        query = (query or "").strip()
+        if not history or not _CONTEXTUAL_FOLLOW_UP_RE.search(query):
             return query
         recent_user = [
             m["content"] for m in history if m.get("role") == "user"

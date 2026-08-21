@@ -1,7 +1,7 @@
 {
   "title": "民事诉讼法",
   "law_name": "民事诉讼法",
-  "effective_date": "2022-01-01",
+  "effective_date": "2024-01-01",
   "source_file": "民事诉讼法.md",
   "article_count": 291,
   "hierarchy_schema": [
@@ -4191,5 +4191,13 @@
       "hierarchy_text": "第四编 涉外民事诉讼程序的特别规定 / 第二十七章 司法协助",
       "content": "本法自公布之日起施行，《中华人民共和国民事诉讼法（试行）》同时废止。"
     }
-  ]
+  ],
+  "full_name": "中华人民共和国民事诉讼法",
+  "status": "effective",
+  "category": "诉讼法律",
+  "issue_org": "全国人民代表大会常务委员会",
+  "issue_date": "2023-09-01",
+  "law_version": "2023年修正",
+  "source": "https://flk.npc.gov.cn/",
+  "has_interpretation": true
 }

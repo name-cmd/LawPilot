@@ -65,3 +65,28 @@ def test_merge_unique_docs():
     merged = merge_unique_docs([d("劳动合同法", "第38条")], [d("劳动合同法", "第38条"), d("工伤保险条例", "第17条")])
     assert len(merged) == 2
     assert merged[1].metadata["law_name"] == "工伤保险条例"
+<<<<<<< HEAD
+=======
+
+
+def test_standalone_question_does_not_inherit_unrelated_history():
+    """新问题点明行政处罚时，历史中的行政复议不能污染向量检索。"""
+    history = [
+        {"role": "user", "content": "行政复议申请期限是多久？"},
+        {"role": "assistant", "content": "……"},
+        {"role": "user", "content": "行政复议机关如何审理？"},
+    ]
+    query = "行政处罚的种类有哪些？"
+    assert AnswerPipeline._build_retrieval_query(query, history) == query
+
+
+def test_contextual_follow_up_keeps_recent_user_history():
+    """“上述决定怎么办”缺少对象，仍应继承上文以维持多轮问答。"""
+    history = [
+        {"role": "user", "content": "行政机关作出罚款决定后怎么办？"},
+        {"role": "assistant", "content": "……"},
+    ]
+    query = "对上述决定不服怎么办？"
+    combined = AnswerPipeline._build_retrieval_query(query, history)
+    assert combined == "行政机关作出罚款决定后怎么办？ 对上述决定不服怎么办？"
+>>>>>>> origin/feat/p1-legal-corpus

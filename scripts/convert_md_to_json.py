@@ -35,6 +35,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import argparse
+import json
 from src.config import Config
 from src.data_processing.md_converter import convert_md_directory
 
@@ -55,6 +56,10 @@ def main() -> None:
         action="store_true",
         help="Only scan top-level .md in --input",
     )
+    parser.add_argument(
+        "--registry", default=str(Config.BASE_DIR / "data" / "law_registry.json"),
+        help="Law metadata registry JSON to embed in processed files",
+    )
     args = parser.parse_args()
 
     input_dir = Path(args.input)
@@ -69,10 +74,13 @@ def main() -> None:
     print(f"输出: {output_dir}")
     print("法律名称: 使用 .md 文件名（不含扩展名）\n")
 
+    registry_path = Path(args.registry)
+    registry = json.loads(registry_path.read_text(encoding="utf-8")) if registry_path.exists() else {}
     results = convert_md_directory(
         input_dir,
         output_dir,
         recursive=not args.no_recursive,
+        registry=registry,
     )
 
     if not results:

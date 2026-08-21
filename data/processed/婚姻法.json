@@ -1,7 +1,7 @@
 {
   "title": "婚姻法",
   "law_name": "婚姻法",
-  "effective_date": "1981-01-01",
+  "effective_date": "2001-04-28",
   "source_file": "婚姻法.md",
   "article_count": 51,
   "hierarchy_schema": [],
@@ -567,5 +567,16 @@
       "hierarchy_text": "",
       "content": "本法自1981年1月1日起施行。\n\n1950年5月1日颁行的《中华人民共和国婚姻法》，自本法施行之日起废止。"
     }
-  ]
+  ],
+  "full_name": "中华人民共和国婚姻法",
+  "status": "repealed",
+  "category": "民事法律",
+  "issue_org": "全国人民代表大会常务委员会",
+  "issue_date": "2001-04-28",
+  "law_version": "2001年修正",
+  "source": "https://flk.npc.gov.cn/",
+  "has_interpretation": false,
+  "repeal_date": "2021-01-01",
+  "superseded_by": "民法典",
+  "note": "民法典第一千二百六十条"
 }
