@@ -1,9 +1,9 @@
 {
-  "name": "lawtrust-frontend",
+  "name": "lawpilot-frontend",
   "private": true,
   "version": "2.0.0",
   "type": "module",
-  "description": "法信通 LawTrust 前端（Vue 3 + Vite + TS + Tailwind v4 + Naive UI + Pinia）",
+  "description": "律策智枢 LawPilot 前端（Vue 3 + Vite + TS + Tailwind v4 + Naive UI + Pinia）",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",

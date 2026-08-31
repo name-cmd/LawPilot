@@ -1,4 +1,4 @@
-"""Pydantic schemas for LawTrust API."""
+"""Pydantic schemas for LawPilot API."""
 from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, Field
 

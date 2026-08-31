@@ -42,11 +42,15 @@ _EFFECTIVE_DATE_PATTERNS = [
     ),
 ]
 
-_PART_RE = re.compile(r"^第[一二三四五六七八九十百千零\d]+编\s+")
-_SUB_PART_RE = re.compile(r"^第[一二三四五六七八九十百千零\d]+分编\s+")
-_CHAPTER_RE = re.compile(r"^第[一二三四五六七八九十百千零\d]+章\s+")
-_SECTION_RE = re.compile(r"^第[一二三四五六七八九十百千零\d]+节\s+")
+# 编/章/节标题允许"第X章"后跟或不跟空格（新格式："## 第二章公司登记"，旧格式："## 第一章 总则"）
+_PART_RE = re.compile(r"^第[一二三四五六七八九十百千零\d]+编\s*")
+_SUB_PART_RE = re.compile(r"^第[一二三四五六七八九十百千零\d]+分编\s*")
+_CHAPTER_RE = re.compile(r"^第[一二三四五六七八九十百千零\d]+章\s*")
+_SECTION_RE = re.compile(r"^第[一二三四五六七八九十百千零\d]+节\s*")
 _SPECIAL_PARTS = frozenset({"附则", "序言", "导言", "总则"})
+
+# 清理条文内容中的排版残留：<br> 换行标签、&nbsp; 等 HTML 实体
+_CLEAN_HTML_RE = re.compile(r"<br\s*/?>|</?br>", re.IGNORECASE)
 
 _HIERARCHY_KEYS = ("part", "sub_part", "chapter", "section")
 
@@ -108,6 +112,8 @@ def _apply_heading(
     chapter: str,
     section: str,
 ) -> Tuple[str, str, str, str]:
+    # 压缩标题内连续空格（如"第一章　总　　则"归一化后为"第一章 总  则"）
+    title = re.sub(r"\s+", " ", title).strip()
     if kind == "part":
         return title, "", "", ""
     if kind == "sub_part":
@@ -135,10 +141,12 @@ def _match_article_line(stripped: str) -> Optional[re.Match]:
 def _find_body_start(lines: List[str]) -> int:
     """Skip title block and TOC; start at first structural heading or article."""
     for i, line in enumerate(lines):
-        stripped = line.strip()
+        stripped = line.strip().replace("　", " ")
         if not stripped:
             continue
         if _match_article_line(stripped):
+            return i
+        if len(stripped) <= 25 and _classify_heading(stripped):
             return i
         hm = _HEADER_RE.match(stripped)
         if hm:
@@ -200,7 +208,8 @@ def parse_markdown_law(
     law_name = law_name_from_source(source_name)
     law_name, effective_date = _extract_metadata(text, law_name)
 
-    lines = text.splitlines()
+    # 全角空格（　）是排版噪声（如"第一章　总　　则"），统一归一化为半角
+    lines = [l.replace("　", " ") for l in text.splitlines()]
     body_start = _find_body_start(lines)
 
     part, sub_part, chapter, section = "", "", "", ""
@@ -211,7 +220,9 @@ def parse_markdown_law(
         nonlocal current
         if not current:
             return
-        content = current["content"].strip()
+        # 清洗排版残留：<br> 转为换行、HTML 实体还原
+        content = _CLEAN_HTML_RE.sub("\n", current["content"])
+        content = content.replace("&nbsp;", " ").strip()
         if content:
             articles.append(
                 _article_record(
@@ -247,6 +258,16 @@ def parse_markdown_law(
                     kind, heading, part, sub_part, chapter, section
                 )
             continue
+
+        # 兼容无 Markdown 前缀的裸标题行（如"第二章调解""第一节设立"），
+        # 这类行是章/节标题而非条文内容，不能被吞进上一条。
+        if len(stripped) <= 25:
+            kind = _classify_heading(stripped)
+            if kind:
+                part, sub_part, chapter, section = _apply_heading(
+                    kind, stripped, part, sub_part, chapter, section
+                )
+                continue
 
         am = _match_article_line(stripped)
         if am:

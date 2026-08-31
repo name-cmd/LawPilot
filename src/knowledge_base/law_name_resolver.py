@@ -1,8 +1,10 @@
 """Resolve cited law names to canonical names used in the vector store metadata."""
+import json
+from pathlib import Path
 from typing import List, Optional
 
-# Canonical names match data/raw/*.md filename stems.
-KNOWN_LAWS = (
+# 兜底列表：仅当 data/processed/ 不可读时使用（正常运行时从 processed JSON 动态构建）
+_FALLBACK_KNOWN_LAWS = (
     "民法典", "宪法", "劳动法", "劳动合同法", "民事诉讼法", "婚姻法",
     "刑法", "公司法", "消费者权益保护法", "道路交通安全法",
     "工伤保险条例", "劳动合同法实施条例", "社会保险法", "劳动争议调解仲裁法",
@@ -13,6 +15,28 @@ KNOWN_LAWS = (
     "著作权法", "商标法", "专利法", "刑事诉讼法", "反电信网络诈骗法",
     "民法典婚姻家庭编解释（一）", "民法典婚姻家庭编解释（二）", "民法典合同编通则解释",
 )
+
+
+def _load_known_laws() -> tuple:
+    """从 data/processed/*.json 动态构建法律名清单（新增法律无需改代码）。"""
+    from src.config import Config
+
+    names: List[str] = []
+    try:
+        for p in sorted(Path(Config.PROCESSED_DATA_DIR).glob("*.json")):
+            if p.name == "law_repeals.json":
+                continue
+            data = json.loads(p.read_text(encoding="utf-8"))
+            title = data.get("title") or p.stem
+            if title and title not in names:
+                names.append(title)
+    except Exception:
+        names = []
+    return tuple(names) if names else _FALLBACK_KNOWN_LAWS
+
+
+# Canonical names match data/raw/*.md filename stems（自动从 processed JSON 构建）。
+KNOWN_LAWS = _load_known_laws()
 
 _ALIASES = {
     "民法": "民法典",

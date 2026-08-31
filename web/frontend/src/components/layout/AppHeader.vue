@@ -101,8 +101,19 @@ async function onUserSelect(key: string) {
     class="flex h-14 shrink-0 items-center justify-between border-b border-line bg-brand-600 px-4 text-white"
   >
     <div class="flex items-center gap-2.5">
-      <span class="text-xl leading-none">⚖️</span>
-      <span class="text-base font-semibold tracking-wide">法信通 LawTrust</span>
+      <!-- 律策智枢 LawPilot 品牌 Logo：天平 + 智能中枢节点 -->
+      <svg class="h-7 w-7 shrink-0" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="3" y="3" width="26" height="26" rx="7" fill="white" fill-opacity="0.12" stroke="white" stroke-width="1.5"/>
+        <circle cx="16" cy="8" r="2" fill="white"/>
+        <path d="M9 13h14" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M16 8v16" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M9 13v6" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M23 13v6" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M6 20h6" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M20 20h6" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M12 26h8" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+      <span class="text-base font-semibold tracking-wide">律策智枢 LawPilot</span>
     </div>
 
     <div class="flex items-center gap-2">

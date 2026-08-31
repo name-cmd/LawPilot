@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import argparse
 import json
+import shutil
 
 from src.config import Config
 from src.data_processing.law_parser import LawParser, LawArticle
@@ -74,9 +75,17 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=500)
     parser.add_argument("--device", default=Config.EMBEDDING_DEVICE,
                         choices=["cuda", "cpu"])
+    parser.add_argument(
+        "--reset", action="store_true",
+        help="构建前清空旧向量库目录（避免新旧数据混合，数据变更后务必加此参数）",
+    )
     args = parser.parse_args()
 
     print("=== 中国法律知识库构建 ===\n")
+
+    if args.reset and Path(args.db_dir).exists():
+        shutil.rmtree(args.db_dir)
+        print(f"  [--reset] 已清空旧向量库: {args.db_dir}\n")
 
     registry = load_manual_registry(Config.LAW_REGISTRY_PATH)
     repeals_path = Path(Config.LAW_REPEALS_PATH)

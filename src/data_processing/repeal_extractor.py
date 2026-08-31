@@ -14,6 +14,8 @@ _REPEAL_CLAUSE_RE = re.compile(
 _BULK_REPEAL_RE = re.compile(
     r"《([^》]+)》(?:[、，]|和|及)*"
 )
+# 只废止部分条文的模式：《XX》第三十二条第一款同时废止 —— 不算整部废止
+_ARTICULAR_REPEAL_RE = re.compile(r"《([^》]+)》第[一二三四五六七八九十百千零\d]+条")
 _EFFECTIVE_REPEAL_LINE_RE = re.compile(
     r"自\s*(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日.*?同时废止",
     re.DOTALL,
@@ -36,13 +38,17 @@ def extract_repealed_laws_from_text(text: str) -> List[str]:
     names: List[str] = []
     seen: set = set()
 
+    # 先识别"仅废止部分条文"的书名（如《XX》第三十二条第一款同时废止），
+    # 这些法律整体仍在施行，不应被误判为整部废止。
+    partially_repealed = set(_ARTICULAR_REPEAL_RE.findall(text))
+
     # Find sentences containing 同时废止
     for sentence in re.split(r"[。\n]", text):
         if "同时废止" not in sentence and "废止" not in sentence:
             continue
         for m in _BULK_REPEAL_RE.finditer(sentence):
             short = _normalize_law_name(m.group(1))
-            if short and short not in seen:
+            if short and short not in seen and short not in partially_repealed:
                 seen.add(short)
                 names.append(short)
     return names
@@ -109,6 +115,14 @@ def extract_from_processed_json(json_path: str) -> List[Dict]:
     return all_records
 
 
+def _strip_agency_prefix(name: str) -> str:
+    """Strip agency prefixes so auto-extracted names can match manual registry keys."""
+    for prefix in ("最高人民法院关于", "最高人民检察院关于"):
+        if name.startswith(prefix):
+            return name[len(prefix):].replace("审理", "", 1)
+    return name
+
+
 def merge_registry(
     auto_records: List[Dict],
     manual_registry: Optional[Dict] = None,
@@ -117,13 +131,19 @@ def merge_registry(
     merged: Dict = dict(manual_registry or {})
     for rec in auto_records:
         key = rec["law_name"]
-        if key not in merged:
-            merged[key] = {
-                "status": rec.get("status", "repealed"),
-                "repeal_date": rec.get("repeal_date", ""),
-                "superseded_by": rec.get("superseded_by", ""),
-                "note": rec.get("note", ""),
-            }
+        if key in merged:
+            continue
+        # 兜底：自动抽取的"整部废止"可能与人工 registry 登记的是同一部法
+        # （如 registry 记为 partially_effective 的司法解释），此时以人工为准。
+        normalized = _strip_agency_prefix(key)
+        if normalized != key and normalized in merged:
+            continue
+        merged[key] = {
+            "status": rec.get("status", "repealed"),
+            "repeal_date": rec.get("repeal_date", ""),
+            "superseded_by": rec.get("superseded_by", ""),
+            "note": rec.get("note", ""),
+        }
     return merged
 
 

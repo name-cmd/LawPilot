@@ -65,8 +65,6 @@ def test_merge_unique_docs():
     merged = merge_unique_docs([d("劳动合同法", "第38条")], [d("劳动合同法", "第38条"), d("工伤保险条例", "第17条")])
     assert len(merged) == 2
     assert merged[1].metadata["law_name"] == "工伤保险条例"
-<<<<<<< HEAD
-=======
 
 
 def test_standalone_question_does_not_inherit_unrelated_history():
@@ -89,4 +87,3 @@ def test_contextual_follow_up_keeps_recent_user_history():
     query = "对上述决定不服怎么办？"
     combined = AnswerPipeline._build_retrieval_query(query, history)
     assert combined == "行政机关作出罚款决定后怎么办？ 对上述决定不服怎么办？"
->>>>>>> origin/feat/p1-legal-corpus

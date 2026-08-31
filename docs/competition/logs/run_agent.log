@@ -1,0 +1,105 @@
+D:\MyProjects\LawTrust\src\knowledge_base\embedder.py:19: LangChainDeprecationWarning: The class `HuggingFaceEmbeddings` was deprecated in LangChain 0.2.2 and will be removed in 1.0. An updated version of the class exists in the `langchain-huggingface package and should be used instead. To use it run `pip install -U `langchain-huggingface` and import as `from `langchain_huggingface import HuggingFaceEmbeddings``.
+  self._embeddings = HuggingFaceEmbeddings(
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 26225.93it/s]
+D:\MyProjects\LawTrust\src\knowledge_base\vector_store.py:40: LangChainDeprecationWarning: The class `Chroma` was deprecated in LangChain 0.2.9 and will be removed in 1.0. An updated version of the class exists in the `langchain-chroma package and should be used instead. To use it run `pip install -U `langchain-chroma` and import as `from `langchain_chroma import Chroma``.
+  self._db = Chroma(
+Loading weights:   0%|          | 0/393 [00:00<?, ?it/s]Loading weights: 100%|██████████| 393/393 [00:00<00:00, 20858.21it/s]
+[API 用量] qwen3.7-plus: prompt=859 completion=169 total=1028
+Loading weights:   0%|          | 0/393 [00:00<?, ?it/s]Loading weights: 100%|██████████| 393/393 [00:00<00:00, 28348.66it/s]
+[qa001] rank=2 match=True cite=0.5769 trust=83.8 15512.9ms
+[API 用量] qwen3.7-plus: prompt=756 completion=144 total=900
+[qa002] rank=1 match=True cite=0.2924 trust=78.7 9426.0ms
+[API 用量] qwen3.7-plus: prompt=95 completion=48 total=143
+[qa003] rank=None match=True cite=1.0 trust=None 1612.6ms
+[API 用量] qwen3.7-plus: prompt=98 completion=29 total=127
+[qa004] rank=None match=True cite=1.0 trust=None 1436.6ms
+[API 用量] qwen3.7-plus: prompt=1140 completion=260 total=1400
+[qa005] rank=1 match=True cite=0.5399 trust=83.2 20886.9ms
+[qa006] rank=1 match=True cite=0.6718 trust=85.5 7212.0ms
+[API 用量] qwen3.7-plus: prompt=847 completion=618 total=1465
+[qa007] rank=1 match=True cite=0.4513 trust=76.6 31806.7ms
+[API 用量] qwen3.7-plus: prompt=740 completion=216 total=956
+[qa008] rank=1 match=True cite=0.5882 trust=84.0 13965.2ms
+[API 用量] qwen3.7-plus: prompt=941 completion=534 total=1475
+[qa009] rank=2 match=True cite=0.5504 trust=83.3 34877.1ms
+[API 用量] qwen3.7-plus: prompt=708 completion=304 total=1012
+[qa010] rank=1 match=True cite=0.5972 trust=79.2 21219.7ms
+[API 用量] qwen3.7-plus: prompt=995 completion=515 total=1510
+[qa011] rank=1 match=True cite=0.5052 trust=82.5 48099.3ms
+[API 用量] qwen3.7-plus: prompt=685 completion=147 total=832
+[qa012] rank=1 match=True cite=0.5353 trust=83.1 8021.1ms
+[API 用量] qwen3.7-plus: prompt=933 completion=352 total=1285
+[qa013] rank=1 match=True cite=0.4832 trust=82.2 23907.3ms
+[API 用量] qwen3.7-plus: prompt=108 completion=45 total=153
+[qa014] rank=None match=False cite=1.0 trust=None 1772.7ms
+[API 用量] qwen3.7-plus: prompt=884 completion=475 total=1359
+[qa015] rank=3 match=True cite=0.3854 trust=80.4 66126.5ms
+[API 用量] qwen3.7-plus: prompt=104 completion=61 total=165
+[qa016] rank=None match=False cite=1.0 trust=None 2009.9ms
+[API 用量] qwen3.7-plus: prompt=821 completion=237 total=1058
+[qa017] rank=1 match=True cite=0.5215 trust=82.8 18391.7ms
+[API 用量] qwen3.7-plus: prompt=946 completion=196 total=1142
+[qa018] rank=1 match=True cite=0.6925 trust=85.9 18512.5ms
+[API 用量] qwen3.7-plus: prompt=840 completion=333 total=1173
+[qa019] rank=1 match=True cite=0.4472 trust=81.5 21070.8ms
+[API 用量] qwen3.7-plus: prompt=643 completion=144 total=787
+[qa020] rank=1 match=True cite=0.4955 trust=82.4 9405.8ms
+[API 用量] qwen3.7-plus: prompt=989 completion=308 total=1297
+[qa021] rank=1 match=True cite=0.6115 trust=84.5 21195.2ms
+[API 用量] qwen3.7-plus: prompt=777 completion=238 total=1015
+[qa022] rank=1 match=True cite=0.318 trust=79.2 17148.1ms
+[API 用量] qwen3.7-plus: prompt=912 completion=277 total=1189
+[qa023] rank=5 match=False cite=0.4873 trust=65.2 29814.0ms
+[API 用量] qwen3.7-plus: prompt=107 completion=64 total=171
+[qa024] rank=None match=False cite=1.0 trust=None 5246.7ms
+[API 用量] qwen3.7-plus: prompt=937 completion=351 total=1288
+[qa025] rank=1 match=True cite=0.4552 trust=81.6 32534.3ms
+[API 用量] qwen3.7-plus: prompt=837 completion=366 total=1203
+[qa026] rank=1 match=True cite=0.472 trust=81.9 26479.8ms
+[qa027] rank=5 match=False cite=0.6771 trust=85.6 9617.4ms
+[API 用量] qwen3.7-plus: prompt=918 completion=318 total=1236
+[qa028] rank=2 match=True cite=0.3182 trust=79.2 29677.5ms
+[API 用量] qwen3.7-plus: prompt=820 completion=525 total=1345
+[qa029] rank=2 match=True cite=0.5592 trust=83.5 26551.1ms
+[API 用量] qwen3.7-plus: prompt=847 completion=160 total=1007
+[qa030] rank=1 match=True cite=0.4587 trust=81.7 14815.3ms
+Report saved: D:\MyProjects\LawTrust\docs\competition\benchmark_20260831_default_agent_legal_qa_gold.json
+{
+  "mode": "agent",
+  "dataset": "legal_qa_gold",
+  "model": "qwen3.7-plus",
+  "mock": false,
+  "count": 30,
+  "top_k": 5,
+  "min_relevance": 0.35,
+  "avg_trust_score": 81.5,
+  "avg_radar": {
+    "truthfulness": 70.45,
+    "safety": 85.28,
+    "fairness": 92.0,
+    "robustness": 75.0,
+    "privacy": 95.0,
+    "ethics": 81.0
+  },
+  "avg_consistency": null,
+  "avg_elapsed_ms": 19611.8,
+  "token_usage": {
+    "qwen3.7-plus": {
+      "prompt": 20287,
+      "completion": 7434,
+      "calls": 28
+    }
+  },
+  "est_cost_yuan": 0.0703,
+  "regeneration_rate": 0.7667,
+  "gold_citation_recall": 0.8667,
+  "answer_match_rate": 0.8333,
+  "avg_faithfulness": 0.6196,
+  "hit_at_1": 0.6,
+  "hit_at_3": 0.7667,
+  "hit_at_5": 0.8333,
+  "mrr": 0.6911,
+  "no_retrieval_rate": 0.1667,
+  "avg_tool_calls": 0.0
+}
+EXIT=0

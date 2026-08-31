@@ -142,14 +142,36 @@ class APIClient:
         )
 
     def _log_usage(self, model_id: str, response) -> None:
-        """打印 token 用量（阶段四成本数据的来源）。"""
-        if Config.API_LOG_USAGE:
-            usage = getattr(response, "usage", None)
-            if usage:
-                print(
-                    f"[API 用量] {model_id}: prompt={usage.prompt_tokens} "
-                    f"completion={usage.completion_tokens} total={usage.total_tokens}"
-                )
+        """打印 token 用量（阶段四成本数据的来源），并追加落盘 usage_log.jsonl。
+
+        落盘文件：data/benchmark/usage_log.jsonl（每行一条 JSON），
+        供 run_legal_trust_benchmark.py 聚合 D 组成本指标；写盘失败不影响主流程。
+        """
+        if not Config.API_LOG_USAGE:
+            return
+        usage = getattr(response, "usage", None)
+        if not usage:
+            return
+        print(
+            f"[API 用量] {model_id}: prompt={usage.prompt_tokens} "
+            f"completion={usage.completion_tokens} total={usage.total_tokens}"
+        )
+        try:
+            from pathlib import Path
+
+            rec = {
+                "ts": time.time(),
+                "model": model_id,
+                "prompt_tokens": usage.prompt_tokens,
+                "completion_tokens": usage.completion_tokens,
+                "total_tokens": usage.total_tokens,
+            }
+            path = Path(Config.BASE_DIR) / "data" / "benchmark" / "usage_log.jsonl"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # 非流式

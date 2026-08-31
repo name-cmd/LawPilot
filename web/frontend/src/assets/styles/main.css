@@ -1,5 +1,5 @@
 /* ============================================================
- * 法信通设计系统 —— Tailwind CSS v4 入口
+ * 律策智枢 LawPilot 设计系统 —— Tailwind CSS v4 入口
  * v4 采用 "CSS-first" 配置：设计令牌直接写在 @theme 里，
  * 组件里用 bg-surface / text-ink / border-line 等类名即可。
  * 暗色模式：.dark 类覆盖令牌变量 → 所有用令牌的组件自动切换。

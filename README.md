@@ -1,4 +1,4 @@
-# 法信通 LawTrust
+# 律策智枢 LawPilot
 
 面向中文法律场景的可信智能问答与多维可信评估平台：RAG 检索 + 多模型 LLM（阿里云百炼 API 7 款可选，可切换本地 Qwen2.5-7B 离线推理）+ 智能体任务编排与工具调用 + 三级引用核验 + TrustLLM 六维可信评分 + 多用户账号体系。FastAPI 后端 + Vue 3 单页 Web 前端。
 
@@ -50,8 +50,8 @@ pytest tests/ -q
 
 | 文档 | 内容 |
 |---|---|
-| [docs/法信通_LawTrust_项目介绍.txt](docs/法信通_LawTrust_项目介绍.txt) | 整体技术架构、产品目标、重要模块、登录使用与环境配置 |
-| [docs/法信通_Web端功能展示清单.txt](docs/法信通_Web端功能展示清单.txt) | Web 端全部功能与操作方法、详细测试用例（含测试数据说明） |
+| [docs/律策智枢_LawPilot_项目介绍.txt](docs/律策智枢_LawPilot_项目介绍.txt) | 整体技术架构、产品目标、重要模块、登录使用与环境配置 |
+| [docs/律策智枢 LawPilot_Web端功能展示清单.txt](docs/律策智枢 LawPilot_Web端功能展示清单.txt) | Web 端全部功能与操作方法、详细测试用例（含测试数据说明） |
 | [docs/测试人员运行指南.txt](docs/测试人员运行指南.txt) | 测试人员零安装访问指南 |
 | [docs/修改日志.txt](docs/修改日志.txt) | 功能/修复变更记录 |
 | [docs/智能体架构说明.txt](docs/智能体架构说明.txt) | 智能体任务调度与工具调用架构 |

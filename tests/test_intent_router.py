@@ -8,7 +8,7 @@ from src.pipeline.intent_router import classify_intent
 _DOC = [
     {
         "filename": "修改日志.txt",
-        "text": "记录法信通项目开发日志，涉及法条识别功能与 Vue 3 前端迁移",
+        "text": "记录律策智枢 LawPilot项目开发日志，涉及法条识别功能与 Vue 3 前端迁移",
     }
 ]
 

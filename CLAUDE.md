@@ -1,10 +1,10 @@
-# CLAUDE.md — 法信通 LawTrust
+# CLAUDE.md — 律策智枢 LawPilot
 
-面向中文法律场景的可信智能问答与多维可信评估平台：RAG 检索 + LLM 生成（本地 Qwen2.5-7B / 百炼 qwen3.7-plus API 双模式）+ 三级引用核验 + TrustLLM 六维可信评分 + 输入守卫，FastAPI 后端 + 单页 Web 前端。项目全貌详见 `docs/法信通_LawTrust_项目介绍.txt`。
+面向中文法律场景的可信智能问答与多维可信评估平台：RAG 检索 + LLM 生成（本地 Qwen2.5-7B / 百炼 qwen3.7-plus API 双模式）+ 三级引用核验 + TrustLLM 六维可信评分 + 输入守卫，FastAPI 后端 + 单页 Web 前端。项目全貌详见 `docs/律策智枢_LawPilot_项目介绍.txt`。
 
 ## 项目结构
 
-**权威来源**：`docs/法信通_LawTrust_项目介绍.txt` 第三节「项目整体结构」。
+**权威来源**：`docs/律策智枢_LawPilot_项目介绍.txt` 第三节「项目整体结构」。
 ⚠️ 修改 / 新增 / 删除项目目录时，必须同步更新该文档（及 README.md），保持二者一致。以下为当前实际布局摘要：
 
 ```

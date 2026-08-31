@@ -180,7 +180,10 @@ function switchMode() {
     <!-- 登录卡片：右侧对齐（pr 留白），白底/微透明白 + 圆角阴影 -->
     <div class="w-full max-w-[500px] pr-0 py-10 sm:pr-12 lg:pr-24">
       <!-- 品牌标语：位于登录卡片外侧上方（页面级 Header），与卡片同宽右对齐 -->
-      <p class="mb-5 text-center text-2xl font-bold tracking-wide text-blue-900">法信通 · 可信的法律智能问答平台</p>
+      <div class="mb-5 text-center">
+        <p class="text-2xl font-bold tracking-wide text-blue-900">律策智枢 LawPilot</p>
+        <p class="mt-1 text-base text-slate-500">面向智慧司法的多智能体协同与全域可信核验问答平台</p>
+      </div>
       <div class="rounded-2xl border border-slate-100 bg-white/95 p-12 shadow-xl backdrop-blur-sm animate-fade-in-up">
         <h1 class="mb-10 text-2xl text-center font-bold text-blue-900">
           {{ mode === 'login' ? '用户登录' : '注册新账号' }}
@@ -271,14 +274,10 @@ function switchMode() {
         </p>
       </div>
 
-      <!-- 测试账号提示（仅登录模式）：测试阶段预置账号，方便演示与测试 -->
-      <p v-if="mode === 'login'" class="mt-4 text-center text-[13px] text-slate-500">
-        测试账号：root / 123456、user1 / 123456、user2 / 123456
-      </p>
     </div>
 
     <!-- 法律协议弹窗（保留原交互：勾选后才可登录） -->
-    <n-modal v-model:show="agreementShow" preset="card" style="width: 480px" title="欢迎使用法信通">
+    <n-modal v-model:show="agreementShow" preset="card" style="width: 480px" title="欢迎使用 LawPilot">
       <p class="text-[13px] leading-relaxed text-ink">
         在使用本平台前，请阅读并同意
         <a class="cursor-pointer text-brand-500 hover:underline" @click="openLegalDoc('user')">《用户协议》</a>、

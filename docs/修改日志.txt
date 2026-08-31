@@ -1,327 +1,656 @@
-================================================================================
-                        法信通 LawTrust — 修改日志
-================================================================================
-
-规则：每次修改功能或修复 Bug 后，按以下格式在文件末尾追加一条记录。
-
---------------------------------------------------------------------------------
-===== YYYY-MM-DD =====
-类型：新增功能 / 修复 / 优化
-内容：一句话说明改动
-涉及文件：xxx.py, yyy.html
-验证：说明验证方式（命令或操作步骤）
---------------------------------------------------------------------------------
-===== 2026-08-04 =====
-类型：新增功能
-内容：LLM 双模式改造——默认走阿里云百炼 qwen3.7-plus API（OpenAI 兼容），保留本地 Qwen2.5-7B 推理可切换（LLM_PROVIDER=local）；新增 api_client.py（重试/超时/流式解析/错误分类）、config 新增 API 配置项、.env 管理 DASHSCOPE_API_KEY；bge/NLI 小模型保持本地，API 模式无需 GPU
-涉及文件：src/config.py, src/llm/api_client.py, src/llm/qwen_model.py, src/uncertainty/logits_entropy.py, requirements.txt, .env.example, .gitignore
-验证：python scripts/demo.py --query "劳动合同解除需要提前多少天通知？"（API 模式输出三段式回答+引用核验）；LLM_PROVIDER=local 回归本地模式；python scripts/run_server.py 浏览器流式问答
---------------------------------------------------------------------------------
-===== 2026-08-04 =====
-类型：修复
-内容：demo.py 在 Windows cmd（GBK 终端）打印 ✓/✗ 等 Unicode 字符时 UnicodeEncodeError 崩溃，改为 stdout/stderr 按 UTF-8 输出（errors=replace 兜底）；核验-重生成闭环验证通过（API 模式自动修正 1 次）
-涉及文件：scripts/demo.py
-验证：python scripts/demo.py --query "劳动合同解除需要提前多少天通知？" 完整输出引用核验与六维可信评估，不再崩溃
---------------------------------------------------------------------------------
-===== 2026-08-04 =====
-类型：新增功能
-内容：阶段九一键部署与团队测试——新增 start_server.bat（检查依赖/知识库/API Key/小模型后启动服务）与 start_tunnel.bat（检测 cpolar/ngrok 自动建隧道，未安装则打印教程）；前端同源架构确认（相对路径 fetch + WebSocket 自动 wss），测试人员零安装仅需浏览器访问公网 URL；不实施指南 9.4 client_connect.bat 与 9.5 配置管理（同源架构不需要）
-涉及文件：start_server.bat, start_tunnel.bat, README.md, CLAUDE.md, docs/法信通_LawTrust_项目介绍.txt
-验证：双击 start_server.bat 启动服务后浏览器 localhost:6006 登录；安装 cpolar 后双击 start_tunnel.bat，手机流量访问公网 URL 提问（流式回答 + 引用核验面板更新）
---------------------------------------------------------------------------------
-===== 2026-08-05 =====
-类型：新增功能
-内容：前端架构迁移 M0——搭建 Vite + Vue 3 (script setup) + TypeScript + Tailwind CSS v4 + Naive UI + Pinia 工程骨架；旧单文件 index.html 归档至 web/frontend/legacy/（可回退）；完成设计系统（品牌蓝 @theme 令牌 + 亮暗双主题，settings store 一键联动 Tailwind 与 Naive UI darkTheme）；三栏布局骨架（AppHeader/SessionSidebar/DetailPanel）+ 登录页静态版；后端静态挂载改为三级回退（dist → legacy → frontend）；生产 base 配置 /ui/ 解决资源 404
-涉及文件：web/frontend/（package.json, vite.config.ts, index.html, src/* 全部新文件）, web/backend/main.py, docs/修改日志.txt
-验证：npm run build 零类型错误；后端 6006 服务 /ui/ 返回新前端（JS/CSS 资源 200）；/figure/sign.png 200；npm run dev 起 5173，/api 代理连通 /api/health 返回 ok；暗色切换按钮可用
-===== 2026-08-05 =====
-类型：新增功能
-内容：前端架构迁移 M1——完成 API 层（client.ts 错误归一三种 detail 形态 / types.ts 与后端 schemas.py 对齐 / auth/chat/misc 接口封装）、auth store（登录态持久化 lawtrust_auth_v2 + v1 数据静默迁移）、sessions store（会话/消息 CRUD + 按用户名隔离持久化 + v1 迁移 + 自动标题）、useChatStream（SSE 解析 + 失败自动降级 /api/chat + AbortController 取消）、useVerificationWS（核验推送连接管理）、登录页完整化（协议弹窗 + 路由守卫 + 刷新保持登录）、ChatView 问答全流程（check-input 三分支：正常/隐私确认弹窗/安全拒答 + 流式打字光标 + Markdown 章节渲染 + 消息操作栏占位）、MarkdownRenderer（markdown-it + DOMPurify 双保险）
-涉及文件：web/frontend/src/（api/*, stores/*, composables/*, components/chat/*, components/common/MarkdownRenderer.vue, views/*, utils/*, router/index.ts, App.vue, main.ts）
-验证：npm run build 零类型错误；dev 联调全链路——登录 root/123456 返回 token、check-input 正常/含手机号(needs_privacy_confirm)/伪造合同(refused) 三分支正确、/api/chat/stream 流式事件序列 meta→124×token→done 完整
-===== 2026-08-05 =====
-类型：新增功能
-内容：前端架构迁移 M2——会话管理完整化：侧栏会话列表支持重命名（RenameModal 弹窗）、删除（n-popconfirm 确认）、清空所有会话（n-dialog 警告确认）、会话时间显示（今天/昨天/日期）、AI 消息标题行（法信通 + TrustBadge 可信分角标：核验中呼吸点 → 流式快速评分 → 完成三色徽章（高/中/低）+ 废止法条警告）；sessions store 持久化改为 userScopedStorage 自定义 storage（解决 pinia-plugin-persistedstate v4 key 只求值一次导致多用户名 key 不更新的问题）
-涉及文件：web/frontend/src/components/layout/SessionSidebar.vue, web/frontend/src/components/chat/ChatMessage.vue, web/frontend/src/components/chat/TrustBadge.vue, web/frontend/src/components/common/RenameModal.vue, web/frontend/src/stores/sessions.ts, web/frontend/src/utils/answer.ts
-验证：npm run build 零类型错误（vue-tsc 全量检查）
-===== 2026-08-05 =====
-类型：新增功能
-内容：前端架构迁移 M3——右侧详情面板完整化：新增 detailPanel store（selectedMsgId/activeTab/isOpen，不持久化，meta 直接引用 sessions 消息对象，WS 推送自动刷新面板）；点击 AI 法律类回答气泡选中/取消（选中高亮边框）；可信评估面板（SVG 总分环 + 等级徽章 + 建议 + 弱维度标签 + 加权贡献分解条 + ECharts 雷达图（按需引入 echarts/core，暗色主题适配，点击维度展开审计）+ 六维列表（展开态：核验状态/摘要/检查 chips/公式审计/跳转引用核验按钮/完整审计说明折叠））；法条溯源面板（法条卡片 + 相关度百分比 + 现行有效/已废止标签（废止标红 + 参见新法）+ 展开全文）；引用核验面板（核验中提示 → 显式引用对比卡片（模型论述摘录 vs 法条对照原文 + 裁决/吻合度/是否在检索结果内）+ 隐性论断（有法律支撑/支撑不足）+ 汇总说明 + 自动修正次数）；移动端抽屉化（桌面 xl 常驻侧栏，移动端 n-drawer 抽屉 + 顶栏 📊 入口按钮）
-涉及文件：web/frontend/src/stores/detailPanel.ts, web/frontend/src/components/detail/*（DetailBody/TrustEvalPanel/RadarChart/ArticleTracePanel/CitationVerificationPanel）, web/frontend/src/components/layout/DetailPanel.vue, web/frontend/src/components/chat/ChatMessage.vue, web/frontend/src/components/layout/AppHeader.vue, web/frontend/src/api/types.ts
-验证：npm run build 零类型错误；dev 5173 HMR 生效
-===== 2026-08-05 =====
-类型：修复
-内容：修复界面被压缩在上半部分、下半页空白的布局 bug——根因是 html/body/#app 未设置 height:100%，子级 h-full 高度链塌陷成内容高度；在 main.css 补全局高度链。同时补齐右上角个人中心缺失的功能（迁移遗漏）：用户菜单完整化（下拉头部显示头像/昵称/账号 + 个人资料 / 我的收藏 / 清空对话记录 / 退出登录四项）；新增 ProfileModal（头像 8 色选择 + 自定义头像上传 ≤1MB + 显示名称 + 个人简介，auth store 新增 updateProfile 持久化到 lawtrust_auth_v2）；新增 favorites store（收藏快照含 meta，按用户名隔离持久化 lawtrust_favorites_v2_xxx + v1 数据迁移）与 FavoritesModal（列表/编辑标题备注/删除）；ChatMessage 底部操作栏加 ☆ 收藏按钮；userScopedStorage 提取到 utils/storage.ts 供 sessions/favorites 共用；登录与路由守卫加载收藏数据
-涉及文件：web/frontend/src/assets/styles/main.css, web/frontend/src/components/layout/AppHeader.vue, web/frontend/src/components/common/ProfileModal.vue, web/frontend/src/components/common/FavoritesModal.vue, web/frontend/src/stores/favorites.ts, web/frontend/src/stores/auth.ts, web/frontend/src/stores/sessions.ts, web/frontend/src/utils/storage.ts, web/frontend/src/components/chat/ChatMessage.vue, web/frontend/src/router/index.ts, web/frontend/src/views/LoginView.vue
-验证：npm run build 零类型错误；dev 5173 与生产 6006 /ui/ 均 200 且服务最新构建
-===== 2026-08-05 =====
-类型：修复
-内容：界面压缩 bug 的真正修复——先前猜测 html/body/#app 缺高度是错的（base.css 本就有 height:100%）；真根因是 Naive UI 三个 provider（n-config-provider/n-message-provider/n-dialog-provider）包裹层高度为 auto，h-full 百分比高度链在中间断链导致布局塌缩成内容高度。ChatView/LoginView 根 div 改用 h-screen（100vh，不依赖父级高度）。同时登录协议弹窗重建为旧版交互：小弹窗「欢迎使用法信通」+ 三个可点开文档的协议链接（《用户协议》《隐私政策》《AI 咨询非正式法律意见》声明，LEGAL_DOCS 真实简短条款）+ 勾选 checkbox 后「同意并继续」按钮才可用 + 独立文档查看弹窗
-涉及文件：web/frontend/src/views/ChatView.vue, web/frontend/src/views/LoginView.vue
-验证：npm run build 零类型错误；dev 5173 / 生产 6006 均服务最新构建（需 Ctrl+F5 硬刷新清除浏览器缓存）
-===== 2026-08-05 =====
-类型：修复
-内容：UI 四项问题修复——（1）右上角美化：移动端详情按钮由 emoji 📊 改为 StatsChartOutline 图标 + 「详情」文字；用户菜单按钮由纯头像改为 头像+用户名+下拉箭头 胶囊按钮；下拉菜单「个人资料/我的收藏」等图标统一 16px 灰调（之前默认尺寸偏大不协调）；（2）可信评估自动展示：法律类回答完成后自动在右侧面板显示（detailPanel 新增 autoShow，追问自动切到最新回答，非法律类回答自动关闭面板）；修复桌面端点击回答时移动端抽屉与侧栏重复弹出的冗余窗口（n-drawer 加 xl:hidden 只在移动端弹出）；（3）用户消息加头像（与个人中心设置一致：头像图/首字 + 头像色），消息容器 max-w-3xl 加宽为 max-w-4xl 减小内容与中间栏边缘的留白；（4）run_server.py 启动前预检 6006 端口占用，重复启动给出通俗提示而非裸报错 [Errno 10048]
-涉及文件：web/frontend/src/stores/detailPanel.ts, web/frontend/src/views/ChatView.vue, web/frontend/src/components/layout/DetailPanel.vue, web/frontend/src/components/layout/AppHeader.vue, web/frontend/src/components/chat/ChatMessage.vue, web/frontend/src/components/detail/DetailBody.vue, scripts/run_server.py
-验证：npm run build 零类型错误；dev 5173 HMR 生效；生产 6006 /ui/ 服务最新 dist（Ctrl+F5 硬刷新）
-===== 2026-08-05 =====
-类型：优化
-内容：详情面板交互优化——（1）删除右上角「详情」按钮（详情已由提问自动展示，按钮多余）；（2）点击 AI 回答不再 toggle 选中（旧行为再点同一消息会清空面板内容，窄屏下抽屉反复弹出灰色遮罩）；selectMessage 改为始终选中并展示，关闭面板统一用面板头部「收起 ✕」按钮（所有尺寸显示，桌面宽屏侧栏可收起）；（3）桌面侧栏改为 v-show 受 isOpen 控制（收起后让出空间），移动端抽屉去掉遮罩（:mask=false，不再盖灰聊天区）
-涉及文件：web/frontend/src/components/layout/AppHeader.vue, web/frontend/src/stores/detailPanel.ts, web/frontend/src/components/layout/DetailPanel.vue, web/frontend/src/components/detail/DetailBody.vue
-验证：npm run build 零类型错误；dev 5173 HMR 生效（Ctrl+F5 硬刷新）
-===== 2026-08-05 =====
-类型：修复
-内容：详情面板默认常驻显示——根因：侧栏原挂在 xl（1280px）断点，窗口窄于 1280 时右侧栏被 CSS 藏起只剩抽屉（默认收起、带遮罩、无收起入口）。修复：侧栏断点放宽到 lg（≥1024px 常驻显示），detailPanel isOpen 初始改为 true（打开页面即显示详情空态）；抽屉仅保留给 <1024px 手机小屏，且仅选中回答后才弹出、无遮罩；「收起」按钮做成带边框背景的按钮样式并移到「详情」文字左侧，点击收起后侧栏隐藏、聊天区 flex 自适应变宽
-涉及文件：web/frontend/src/components/layout/DetailPanel.vue, web/frontend/src/stores/detailPanel.ts, web/frontend/src/components/detail/DetailBody.vue
-验证：npm run build 零类型错误；dev 5173 HMR 生效（Ctrl+F5 硬刷新）
-===== 2026-08-05 =====
-类型：修复
-内容：详情面板问题针对性修复（前两轮改动已确认全部在构建产物中，本轮回应用户缓存 + 三处真实缺口）——（1）彻底移除 n-drawer 抽屉：抽屉容器是全屏 fixed 浮层，是灰色阴影、点击拦截、收起后聊天区不变宽的根源；详情改为普通 flex 侧栏所有视口常驻显示（w-72/xl:w-80，v-show 控制），任何宽度下无浮层无遮罩，收起后面板让出空间聊天区自动变宽；（2）进入页面自动展示最近一条法律类回答的评估（ChatView onMounted 查找最后一条法律类消息 autoShow，无则显示空态）；（3）后端 /ui 的 index.html 加 Cache-Control: no-cache（构建后浏览器不再用缓存旧入口加载已删除的旧 JS）
-涉及文件：web/frontend/src/components/layout/DetailPanel.vue, web/frontend/src/views/ChatView.vue, web/backend/main.py
-验证：npm run build 零类型错误；重启后端后 curl -si localhost:6006/ui/ 返回 200 + cache-control: no-cache，JS hash 与 dist 一致（index-1RR6fhKf.js）；根路径 307 重定向 /ui/index.html；用户需用无痕窗口验证
-===== 2026-08-05 =====
-类型：优化
-内容：收起详情面板后对话内容宽度自适应——根因：消息列表容器写死 max-w-4xl（固定 896px 居中），收起详情后聊天区虽变宽但内容仍锁在 896px（两侧空白变大、内容无变化）。修复：消息列表容器去掉固定最大宽度占满聊天区，气泡宽度改为 min(900px, 88%)（跟随聊天区变宽，900px 封顶保证可读性）；收起/展开详情时对话内容随布局自适应
-涉及文件：web/frontend/src/views/ChatView.vue, web/frontend/src/components/chat/ChatMessage.vue
-验证：npm run build 零类型错误；6006 服务新构建（index-D1a1f-4G.js）；浏览器收起详情面板后消息内容变宽
-===== 2026-08-05 =====
-类型：新增功能 / 优化
-内容：登录界面全面改版——背景图换为 figure/sign1.png（浅色紫调图，去掉原深蓝渐变遮罩），登录卡片改为右侧对齐（sm 以上 pr-12/lg:pr-24 留白）叠加在背景右侧近白斜切留白区；卡片改纯净白底（bg-white/95 + rounded-2xl + shadow-lg）；标题「用户登录」（text-2xl font-bold text-indigo-950）；用户名/密码框由 Naive UI 输入框改为原生 input（左侧 User/钥匙图标、border-slate-200、focus 紫色光圈 ring-purple-500/20、密码框保留眼睛切换）；新增「记住密码」复选框（accent-purple-600，勾选后账号密码存 localStorage 回填，未勾选清除）；登录按钮改紫色满宽长按钮（bg-purple-600 hover:700 active:800）；底部新增「还没有账号？立即注册」链接（点击 toast 提示测试阶段未开放注册）；删除左侧品牌白字文案（浅色背景上不可读）
-涉及文件：web/frontend/src/views/LoginView.vue
-验证：npm run build 零类型错误；6006 服务新构建（index-Dq8IgqlH.js），/figure/sign1.png 200 可访问；浏览器无痕窗口打开 http://localhost:6006 检查视觉效果、记住密码回填、协议弹窗与登录流程
-===== 2026-08-05 =====
-类型：优化
-内容：登录卡片 4 点细节调整——（1）卡片加宽（max-w-420px→440px）、内边距加大（p-8→p-10）、表单纵向间距拉开（space-y-4→space-y-6）、输入框与按钮内边距加高（py-3→py-3.5）；（2）标题重构：品牌标语「法信通 · 可信法律智能问答平台」移至卡片最上方做品牌 Header（text-xl font-bold tracking-wide text-indigo-950），下方紧跟主标题「用户登录」（text-2xl font-bold text-purple-900）；（3）删除底部测试账号提示行；（4）卡片细节：加 backdrop-blur-sm + shadow-xl + border-slate-100 细边框，与背景图斜切浅色块融合
-涉及文件：web/frontend/src/views/LoginView.vue
-验证：npm run build 零类型错误；6006 服务新构建（index-DPkasRtt.js），无痕窗口打开 http://localhost:6006 检查视觉效果
-===== 2026-08-05 =====
-类型：修复 / 优化
-内容：登录界面 3 点调整——（1）品牌标语「法信通 · 可信法律智能问答平台」移出登录卡片（置于卡片外上方做页面级 Header，text-xl font-bold tracking-wide text-indigo-950）；（2）修复图标显示位置：用户名/密码图标与眼睛按钮改用 flex 布局——图标与输入框共用一个带边框的 flex 容器（边框与 focus-within 紫色光圈在父容器上），图标、输入框、眼睛按钮是同一方框内的子元素，物理上不可能渲染到方框外（原 absolute 定位在用户浏览器中出现偏移）；（3）卡片加长：内边距 p-10→p-12、标题下间距 mb-6→mb-10、表单间距 space-y-6→space-y-8、输入框与按钮内高 py-3.5→py-4、注册链接上间距 mt-6→mt-10，卡片高度约 455px→500px，内部输入框同步加高
-涉及文件：web/frontend/src/views/LoginView.vue
-验证：npm run build 零类型错误；6006 服务新构建（index-CJx9GDBh.js）；headless 渲染 DOM 确认品牌标语在卡片外、flex 同框容器生效；无痕窗口打开 http://localhost:6006 检查
-
-===== 2026-08-05 =====
-类型：优化
-内容：登录界面统一蓝色主题——紫色系全部改为蓝色系（blue-600/blue-900 等 Tailwind 默认 blue 色板）：主标题 text-purple-900→text-blue-900，用户名/密码输入框 focus 光圈 focus-within:border-purple-600 + ring-purple-500/20→blue 对应，眼睛按钮 hover:text-purple-600→hover:text-blue-600，记住密码勾选 accent-purple-600→accent-blue-600，登录按钮 bg-purple-600 hover:purple-700 active:purple-800→bg-blue-600 hover:bg-blue-700 active:bg-blue-800，注册链接 text-purple-600→text-blue-600；布局、字号、间距等其他样式一律不动
-涉及文件：web/frontend/src/views/LoginView.vue
-验证：npm run build 零类型错误；6006 服务新构建（index-BdUxPrD7.js）；无痕窗口打开 http://localhost:6006 检查登录页为蓝色系
-
-===== 2026-08-05 =====
-类型：新增功能 / 优化
-内容：问答主界面一体化三栏浅色重构（蓝色主调）——（1）左侧会话栏：深蓝渐变改浅灰底（bg-slate-50 border-r border-slate-200），宽度 240→260px，新建会话改深蓝主按钮（bg-blue-600），选中项 bg-white + shadow-sm + 左侧蓝条（border-l-4 border-blue-600）；（2）中间对话区：背景 bg-slate-100/50，顶部新增固定标题 Header（当前会话标题 + 核验状态卡片：核验中灰卡 / 完成蓝卡「高可信 · N 处法条已核验」），空会话欢迎页改白底卡片；（3）AI 回复重构为单层白底卡片（rounded-xl bg-white p-6 shadow-sm），取消多重外框嵌套：卡片头部 = ⚖️天平头像 + 法信通 + 金/绿渐变评分徽章（TrustBadge 改为 bg-gradient-to-r from-amber-400 to-green-500「★ 综合可信分 85.8 - 高可信」，核验中为灰底徽章）；【结论】淡蓝块（bg-blue-50/60 border-l-4 border-blue-600 rounded-r-lg p-4），【法律分析】行高 1.7，【依据法条】法典小卡片（bg-slate-50 rounded-lg + BookOutline 图标）；（4）底部输入框改居中悬浮式（max-w-3xl rounded-2xl shadow-lg，去掉顶部边框），卡片底部整合两个微型 Toggle（RAG 检索 / 自一致性评估）+ 淡灰小字「回答由 AI 生成，仅供参考」；（5）右侧评估面板加宽至 340px 白底：信任环保留放大（96px、数字 text-3xl），徽章/建议/元信息合并为短评行「高可信 · N 处法条已核验」，加权贡献条改柔和蓝绿渐变进度条（from-blue-500/60 to-green-500/60、贡献分蓝色加粗），六维雷达图网格线淡灰（stroke-slate-200 系）、数据区半透明蓝填充（fill-blue-500/20、stroke-blue-600）、高度 210→240px + 半径 68% 防维度标签重叠；所有浅色容器补 dark: 变体保证深色主题下可读
-涉及文件：web/frontend/src/views/ChatView.vue, web/frontend/src/components/layout/SessionSidebar.vue, web/frontend/src/components/layout/DetailPanel.vue, web/frontend/src/components/chat/ChatMessage.vue, web/frontend/src/components/chat/TrustBadge.vue, web/frontend/src/components/chat/AnswerContent.vue, web/frontend/src/components/chat/ChatInput.vue, web/frontend/src/components/detail/TrustEvalPanel.vue, web/frontend/src/components/detail/RadarChart.vue
-验证：npm run build 零类型错误；curl 确认 6006 服务新构建（index-BdUxPrD7.js == dist，StaticFiles 动态读盘无需重启后端）；无痕窗口登录 root/123456 后检查三栏配色、AI 卡片结构、悬浮输入框、评估面板评分环/贡献条/雷达图，并完成一轮真实问答验证流式输出与核验刷新
-
-===== 2026-08-06 =====
-类型：优化
-内容：聊天界面细节调整——删除顶栏「可信法律问答」徽章；删除聊天区用户/AI 头像；用户气泡内边距调近（px-4 py-3 → px-3 py-2.5）；AI 回答【结论】【法律分析】【依据法条】去方框去底色，统一纯文字标题样式；输入框宽度与消息气泡对齐（max-w-3xl → max-w-[min(900px,88%)]，收起右栏自动变宽）；输入区顶部加半透明渐变遮罩过渡
-涉及文件：AppHeader.vue, ChatMessage.vue, AnswerContent.vue, ChatInput.vue
-验证：npm run build 零错误；curl http://localhost:6006/ui/ 返回 index-DbBrBlaS.js 与 dist 一致；无痕窗口人工核对视觉效果
-
-===== 2026-08-06 =====
-类型：优化
-内容：聊天界面第二轮调整——删除 AI 回答卡片头部「法信通」与「★ 综合可信分」徽章；【结论】【法律分析】【依据法条】标题左侧分别添加对勾/天平/法典小图标；输入框改为满宽贴边（去掉 mx-auto 居中与 900px 上限），左右边缘与消息气泡对齐，收起右侧评估面板时同步自适应变宽；删除上轮误加的顶部渐变遮罩
-涉及文件：ChatMessage.vue, AnswerContent.vue, ChatInput.vue
-验证：npm run build 零错误；curl http://localhost:6006/ui/ 返回 index-CQrq8dQ-.js 与 dist 一致；无痕窗口人工核对视觉与交互
---------------------------------------------------------------------------------
-===== 2026-08-06 =====
-类型：新增功能
-内容：阶段八主线·模型层升级——多模型注册表（src/llm/model_registry.py：7 个模型 qwen3.7-plus/qwen-turbo/qwen3.7-max/deepseek-v4-flash-0731/deepseek-v4-pro/kimi-k2.6/glm-5.2，共用百炼 DASHSCOPE_API_KEY）+ 统一模型接口（src/llm/base.py）；APIClient 改按请求传 model_id（per-model enable_thinking 降级、错误文案泛化）；QwenModel 按注册表分发、按 base_url 缓存客户端；后端新增 GET /api/models（模型目录+离线引擎就绪检测），chat 请求体支持 model/global_model（Auto 解析：前端设置面板 → .env DEFAULT_API_MODEL），SSE 首事件必发 meta 携带实际模型名；修复 config API_MODEL 硬编码（.env 覆盖无效）；前端新增 ModelSelector 两级选择器（离线调用/API 调用，离线未就绪置灰+原因提示）与 SettingsModal（全局默认模型），消息气泡展示模型名，修复非法律回答覆盖 meta 的 bug；实测全部模型支持 enable_thinking=False（关闭思考后 GLM 等第三方模型不再空回答、token 消耗大降）
-涉及文件：src/config.py, src/llm/model_registry.py, src/llm/base.py, src/llm/api_client.py, src/llm/qwen_model.py, src/pipeline/answer_pipeline.py, src/uncertainty/self_consistency.py, web/backend/schemas.py, web/backend/main.py, web/frontend/src/（api/types.ts, api/misc.ts, stores/models.ts, stores/settings.ts, stores/sessions.ts, components/chat/ModelSelector.vue, components/common/SettingsModal.vue, components/layout/AppHeader.vue, components/chat/ChatInput.vue, components/chat/ChatMessage.vue, views/ChatView.vue）, .env.example
-验证：GET /api/models 返回 7 模型+离线状态；流式指定 deepseek-v4-flash-0731/glm-5.2 等正常回答（done 事件含 model_id/model_name）；model=auto + global_model=qwen-turbo 实际走 qwen-turbo；非法模型/离线调用返回 400 中文提示；同步验证 rag 命中时自一致性采样沿用同一模型（[API 用量] 打印一致）；npm run build 零类型错误；浏览器手动切换模型对比回答正常
-
-===== 2026-08-06 =====
-类型：修复 + 优化
-内容：多模型接入后的三处问题修复与前端调整——1) 修复可信核验一直显示「核验中 · 初步回答已生成」且详情不刷新：后台核验线程（BackgroundTasks 线程池）用 asyncio.run 新建事件循环广播 WebSocket 结果，与主循环绑定的连接不兼容（attached to a different loop）导致结果永远送不到前端；改为服务启动时绑定主循环（lifespan 里 bind_main_loop）+ run_coroutine_threadsafe 调度回主循环广播；前端核验失败防呆：收到 verification_error 时消息 verification_status 置 error（types 类型补 'error'），面板退出「核验中」展示已有初步评估；2) 删除中栏顶部标题栏（会话标题与「引用核验中…」状态卡片，只留对话内容）；3) 输入区布局：模型选择器与发送/停止按钮移至卡片右下角，输入框上方不再显示模型选择行，「回答由 AI 生成，仅供参考」移至输入卡片外底部居中；4) 模型选择面板精简：引擎选择仅保留「离线调用/API 调用」两个选项（删除「本地 Qwen2.5-7B · 数据不出本机」「云端大模型 · 7 款可选」副标题），离线未就绪红字（未就绪:未检测到可用CUDA GPU）改为悬停方框内显示，模型名下方说明文字（Auto 的「跟随全局默认」、各模型价格档位）全部删除改悬停 title 显示定位介绍
-涉及文件：web/backend/verification_worker.py, web/backend/main.py, web/frontend/src/views/ChatView.vue, web/frontend/src/components/chat/ChatInput.vue, web/frontend/src/components/chat/ModelSelector.vue, web/frontend/src/api/types.ts
-验证：npm run build 零类型错误；后端重启后流式问答正常（meta 携带模型名/120 chunk/done 带 message_id），WebSocket 3 秒内收到 verification_complete（可信分 82.6、4 处引用核验），总耗时 14s——修复前该推送永远收不到
---------------------------------------------------------------------------------
-===== 2026-08-07 =====
-类型：新增功能
-内容：模型选择器供应商 logo——新增 scripts/download_model_logos.py 从官方渠道（GitHub 官方组织头像/官网 favicon，ICO 自动经 PIL 转 PNG）下载 4 个品牌 logo 到 web/frontend/public/logos/（qwen/deepseek/kimi/glm.png，对应 7 个模型的品牌映射：qwen 系 3 个、deepseek 系 2 个、kimi、glm）；ModelSelector.vue 顶部摘要按钮与模型列表（含 Auto 行）在名称前展示品牌 logo（import.meta.env.BASE_URL 兼容 dev /ui 生产路径），缺图时 @error 自动隐藏不破坏文字展示，离线调用时摘要按钮显示锁图标
-涉及文件：scripts/download_model_logos.py, web/frontend/src/components/chat/ModelSelector.vue
-验证：脚本运行成功且 4 张图均为有效 PNG（PIL 检查尺寸）；npm run build 零类型错误；dist/logos/ 下 4 张图已复制，/ui/logos/qwen.png 与新版 index-*.js 均 200（StaticFiles 实时读盘，无需重启后端）；浏览器强刷后模型列表与顶部按钮显示品牌 logo，切换模型 logo 跟随变化
---------------------------------------------------------------------------------
-===== 2026-08-07 =====
-类型：修复
-内容：GLM 供应商 logo 下载错误——原从 zhipuai GitHub 组织下载的是全灰空占位图（仅 1.5KB），改为智谱官方开源组织 zai-org 的头像（GLM 系列模型的官方发布方，460x460 RGBA 有效 logo）；同步修正下载脚本中 GLM 的来源（zhipuai 头像为空占位图、zhipuai.cn 官网 favicon 返回 HTML，均不可用，仅保留 zai-org）
-涉及文件：web/frontend/public/logos/glm.png, scripts/download_model_logos.py
-验证：PIL 检查新图 460x460 RGBA 非空；ASCII 渲染确认 Z 形品牌标识；已同步 dist/logos/glm.png，服务端 /ui/logos/glm.png 返回 200 且字节数由 1532 变为 8570；浏览器强刷后模型列表 GLM 显示正确 logo
---------------------------------------------------------------------------------
-===== 2026-08-07 =====
-类型：优化
-内容：前端三处细节优化——1) 模型选择器 Auto 行的 logo 改为专属标识（渐变圆底+白色星光图标，代表「智能自动选择」），不再绑定默认模型（qwen）品牌 logo；2) 详情面板收起后（头部「收起」按钮），右侧边缘中部悬浮半圆展开按钮（fixed 贴屏幕右缘、垂直居中、hover 变品牌蓝），点击重新展开面板；3) 回答正文「依据法条」章节开启条号高亮：MarkdownRenderer 新增可选 prop highlight-article，通过 markdown-it 自定义 inline 规则把「第X条」（阿拉伯/中文数字）渲染为品牌蓝加粗（nowrap 防行尾断行），其余章节与全局渲染不受影响
-涉及文件：web/frontend/src/components/chat/ModelSelector.vue, web/frontend/src/components/layout/DetailPanel.vue, web/frontend/src/components/common/MarkdownRenderer.vue, web/frontend/src/components/chat/AnswerContent.vue
-验证：npm run build 零类型错误；新产物 index-Cr8Ovx-X.js 服务端 200 且 index.html 已引用（StaticFiles 实时读盘无需重启后端）；浏览器强刷后依次检查：模型选择器 Auto 行显示渐变星光标识、收起详情面板后右缘出现展开按钮且点击可重新展开、提问后「依据法条」内《劳动法》第三十一条等条号为品牌蓝加粗
---------------------------------------------------------------------------------
-===== 2026-08-07 =====
-类型：修复
-内容：三处遗留问题修复——1) 模型选择器摘要按钮：选 Auto 时只显示「Auto」+ 渐变星光标识（原显示「Auto · Qwen3.7 Plus」+ 默认模型品牌 logo），具体模型名只在选定具体模型时显示；2) 详情面板收起后点悬浮按钮重新展开时不再显示空态：detailPanel store 新增 openWithLatest 动作（自动选中当前会话最后一条 AI 回答并切到可信分析 tab），展开按钮改调该动作（原 close 会把 selectedMsgId 清成 null 且展开按钮只设 isOpen，导致面板空态需再点消息才显示）；3) 法条条号高亮不生效：根因是 markdown-it 的 text 规则会把整段普通文本一次性收集、自定义 inline 插件规则（注册在 emphasis 前）永远无法命中「第X条」（Node 实测三种写法均未命中）；改为渲染后文本替换——md.render 输出 HTML 后用正则把「第X条」包上 span.article-no（命中加粗/列表/多行任意位置），再经 DOMPurify 消毒（span+class 在白名单内）
-涉及文件：web/frontend/src/components/chat/ModelSelector.vue, web/frontend/src/stores/detailPanel.ts, web/frontend/src/components/layout/DetailPanel.vue, web/frontend/src/components/common/MarkdownRenderer.vue
-验证：Node 实测替换方案在纯文本/加粗/**列表**/多行四种场景均输出 span.article-no；npm run build 零类型错误；新产物 index-UuH9EClx.js 服务端 200 且 index.html 已引用；浏览器强刷后：选 Auto 摘要按钮显示星光+「Auto」、收起面板后展开自动显示最新回答可信分析、依据法条内条号为品牌蓝加粗
---------------------------------------------------------------------------------
-===== 2026-08-07 =====
-类型：优化
-内容：三处前端细节优化——1) 依据法条的法律名称（如《劳动法》）与条号同款高亮（品牌蓝加粗）并额外加斜体：MarkdownRenderer 渲染后替换新增《[^《》]+》正则（先替换法律名称再替换条号，二者互不重叠），新增 span.law-name 样式；2) 回答左下角模型角标：Auto 模式下显示「Auto」而非后端解析后的实际模型名——消息 meta 新增 requested_model 字段（发起时 settings.apiModel 快照），ChatView 在 meta/onDone/onFallback 各写入处透传，角标据此显示（悬停 title 保留「Auto · 实际使用 X」便于查看真实模型，历史消息无该字段按原样显示）；3) 暗色主题两处白底修复：左侧「新建会话」按钮补 dark:bg-slate-700/dark:text-slate-200/dark:border-slate-600/dark:hover:bg-slate-600；用户提问气泡补 dark:bg-slate-700/dark:text-slate-100（原固定浅蓝底+继承暗色浅色文字导致内容看不清）
-涉及文件：web/frontend/src/components/common/MarkdownRenderer.vue, web/frontend/src/api/types.ts, web/frontend/src/views/ChatView.vue, web/frontend/src/components/chat/ChatMessage.vue, web/frontend/src/components/layout/SessionSidebar.vue
-验证：Node 实测替换逻辑在纯文本/加粗/**列表**/多行/长法律名称（《中华人民共和国劳动法》）五种场景均同时输出 span.law-name 与 span.article-no；npm run build 零类型错误（vue-tsc 通过）；新产物 index-sgbQJa-i.js 服务端 200 且 index.html 已引用（StaticFiles 实时读盘无需重启）；浏览器强刷后：依据法条内《劳动法》为品牌蓝加粗斜体、第三十一条仍为品牌蓝加粗；选 Auto 提问后左下角角标显示「Auto」（悬停可见实际模型名）；切换暗色主题后新建会话按钮与用户气泡均为深色底浅色字
---------------------------------------------------------------------------------
-===== 2026-08-07 =====
-类型：修复
-内容：两处联动的核验/会话 bug——1) 引用核验结果丢失卡死：根因是 sessions store 的 updateMessage 只在「当前会话」内查找消息，而核验经 WS 异步返回（约 5~30 秒），期间用户切到别的会话时结果到达却找不到消息而被丢弃，消息永远停在「核验中」（后端日志证实广播成功但前端不应用，切会话场景必现）。修复：updateMessage 改为跨会话查找（消息 id 全局唯一，纯超集行为安全），并新增 applyVerificationResult / applyVerificationError 两个跨会话 action（WS 广播与面板自愈共用），ChatView 的 onComplete/onError 改走这两个 action；2) 切换会话时右侧详情面板不跟随：selectedMsgId 仍指向旧会话消息（面板跨会话搜索导致残留旧内容）。修复：ChatView 监听 currentSessionId 变化，自动选中新会话最新一条法律回答展示核验详情（detail.autoShow），新会话无法律回答则清空选择显示空态（detailPanel 新增 clearSelection action）；3) 自愈重连：DetailBody 监听选中的消息，若仍是「核验中」自动重连核验 WS（后端 task_registry 对已完成任务立即重放结果），页面刷新/错过广播的历史卡死消息一点即恢复
-涉及文件：web/frontend/src/stores/sessions.ts, web/frontend/src/stores/detailPanel.ts, web/frontend/src/views/ChatView.vue, web/frontend/src/components/detail/DetailBody.vue
-验证：npm run build 零类型错误（vue-tsc 通过）；新产物 index-Bq_WIZhG.js 已被服务端 index.html 引用（StaticFiles 实时读盘无需重启）；浏览器强刷后：提问后核验期间切换到其他会话再切回，核验结果正常显示（不再卡「核验中」）；切换会话右侧面板自动显示新会话最新回答的核验详情；历史卡死消息点击后自动恢复
-===== 2026-08-08 =====
-类型：修复
-内容：恢复多模态文档上传与可信分角标两项功能（多模型前端重构时丢失的 UI 接线）——1) 文档上传：api/misc.ts 新增 uploadDocument（multipart 原生 fetch + normalizeError 错误归一）与 fetchSupportedFormats；ChatInput.vue 新增「📎 上传文档」按钮与待发送附件列表（解析中/字数/移除，最多 5 个）；ChatView.vue 接线 ask 流程——解析中附件提示等待、仅上传文档自动以「请分析以上上传的文档内容…」提问（displayQuery 显示为「（基于上传文档的分析请求）」）、附件随用户消息展示文件名+字数、发送后清空（隐私确认未通过时保留）；2) 可信分角标：ChatMessage.vue 接入长期未引用的 TrustBadge.vue，恢复「★ 综合可信分 82 - 高可信」金绿渐变角标与「⚠ 含已废止法条」警告角标（核验中显示灰色动态徽章）。后端未改动（/api/documents/extract、user_documents 注入、六维评分本就在位）
-涉及文件：web/frontend/src/api/misc.ts, web/frontend/src/components/chat/ChatInput.vue, web/frontend/src/views/ChatView.vue, web/frontend/src/components/chat/ChatMessage.vue
-验证：npm run build 零类型错误；后端实测：POST /api/documents/extract 解析 txt 成功（53 字），POST /api/chat 带 user_documents 提问「这份合同有什么风险条款？」返回 intent=legal_qa、回答结合合同内容、六维可信评估完整（overall_score 82.3 / 高可信，六维雷达 69.5/88/92/75/95/85，法条溯源 5 条）
---------------------------------------------------------------------------------
-===== 2026-08-09 =====
-类型：修复
-内容：上传文档内容模型读不到的真正根因——意图路由误判丢弃文档。排查过程：前端上传/解析/组装/缓存全链路验证通过，后端诊断日志证实 user_documents 已到达（22945/34538 字文档均收到），但回答仍不引用；定位到 classify_intent：用户问「帮我分析一下文档内容」这类无法律关键词的请求被兜底判为 general_non_legal，而 generate_answer_stream 的非法律分支显式置 context_docs=None，用户文档随上下文一起被丢弃（模型完全看不到文档，只能答法律套话）。修复：intent_router.classify_intent 新增 has_documents 参数（greeting 之后优先判断），携带用户文档即强制判 legal_qa（0.85，理由「携带用户上传文档，按文档分析处理」），answer_pipeline 的 run/prepare_context 两处调用传入 bool(user_documents)；非法律分支仅保留给真正的寒暄/非法律请求
-涉及文件：src/pipeline/intent_router.py, src/pipeline/answer_pipeline.py
-验证：重启后端后复现原失败场景（上传 txt + 提问「请帮我分析一下这份文档的内容」无法律关键词）：SSE meta 事件 intent=legal_qa（confidence 0.85、reason 携带用户上传文档），回答完整引用文档内容（Vue 3/FastAPI/多模态/六维可信评估等文档原文内容，且诚实指出该文档为技术说明不适用合同类法条）；回归：法律关键词提问（违约金/仲裁）+ 文档仍正常引用（回答含「五万元」「仲裁」）
---------------------------------------------------------------------------------
-===== 2026-08-09 =====
-类型：优化
-内容：两处改进——1) 文档分析场景（上传非法律文档）：此前携带文档一律走法律流程，回答硬套【结论】【法律分析】【依据法条】三段式并罗列检索到的无关法条（如上传《项目改进指南.txt》答出一堆不适用法条，噪音大易误导）。修复：answer_pipeline 新增 _is_document_analysis 判定（文档文本与提问均不含法律关键词即判定为文档分析场景），此时跳过 RAG 检索（不产生无关法条）+ 改用 qwen_model 新增的文档分析专用 system prompt（客观总结文档要点；文档涉法则仍按三段式引用直接相关法条）；intent 保持 legal_qa（前端判定与详情面板不受影响）。前端配套：RAG 未命中/纯文档分析时后端不启动核验任务，ChatView onDone 清除 onMeta 写入的「核验中」状态并仅在 done.trust 存在时连接核验 WS（修复消息永久显示「引用核验中…」）；2) 回答卡片底部操作栏新增反馈/复制/重新生成：ChatMessage 收藏按钮旁新增 👍 有帮助 / 👎 需改进（记录进消息 feedback.rating 字段随会话持久化、再次点击取消、选中高亮）、复制（navigator.clipboard + 失败提示）、↻ 重新生成（ChatView onRegenerate：移除旧回答→新占位→按原问题重跑流水线；纯文档提问还原为实际请求；文档上下文从消息附件保存的截断文本回传——MessageAttachment 新增 text 字段，ask 时按后端 12000 字符上限截断存储避免 localStorage 膨胀）；3) 输入框 placeholder 精简：删除「；可附加文档辅助分析」
-涉及文件：src/pipeline/answer_pipeline.py, src/pipeline/intent_router.py, src/llm/qwen_model.py, web/frontend/src/components/chat/ChatMessage.vue, web/frontend/src/views/ChatView.vue, web/frontend/src/stores/sessions.ts, web/frontend/src/components/chat/ChatInput.vue
-验证：后端脚本实测三场景——非法律文档+通用提问：intent=legal_qa、rag_used=False、回答以「该文档为技术类文档，不涉及具体法律分析」开头并按要点总结文档、无三段式无法条；涉法文档（劳动合同）+法律提问：rag_used=True、三段式+引用《劳动合同法》行为不变；纯法律提问无文档：行为不变。npm run build 零类型错误（首次报 MessageAttachment 未导入，补 import 后通过）；新产物 index-C_i5315h.js 已被服务端 index.html 引用（重启后端后生效）；浏览器强刷后：回答底部操作栏出现 👍/👎/复制/↻ 重新生成、点赞高亮且再点取消、复制 toast、重新生成后回答更新（带文档回答仍引用文档内容）、输入框提示词已精简
-===== 2026-08-09 =====
-类型：优化
-内容：AI 回答气泡底部操作栏 UI 精简与图标化——1) 删除「★ 综合可信分」徽章（TrustBadge.vue 移除可信分/核验中徽章，仅保留「⚠ 含已废止法条」安全警告；核验中状态由操作栏「引用核验中…」文字提示）；2) 删除「已核验」字样（核验完成后不再显示任何核验状态字样）；3) 模型角标增加品牌 logo：logo 映射逻辑抽为公共模块 utils/modelLogo.ts（ModelSelector 与 ChatMessage 共用，按 model_id 前缀映射 qwen/deepseek/kimi/glm 四品牌，Auto 模式显示实际模型的品牌 logo，缺图自动隐藏）；4) 点赞/点踩/复制/重新生成/收藏五个按钮改为纯图标（@vicons/ionicons5：ThumbsUp/ThumbsDown/Refresh/Copy/Star），无文字、悬停（title + 灰底加深）显示功能提示，浅灰圆角按钮组容器参考 FontAwesome 风格，选中态实心着色（赞绿/踩红/收藏黄）
-涉及文件：web/frontend/src/components/chat/ChatMessage.vue, web/frontend/src/components/chat/TrustBadge.vue, web/frontend/src/components/chat/ModelSelector.vue, web/frontend/src/utils/modelLogo.ts（新增）
-验证：npm run build 零类型错误（新产物 index-D0DUdUxH.js 已被服务端 index.html 引用，HTTP 200）；后端健康检查通过；浏览器强刷后检查：气泡下方无「综合可信分」徽章、无「已核验」字样；模型名左侧显示品牌 logo（Auto 显示实际模型 logo）；五个操作按钮为纯图标，悬停出现功能提示，点赞选中变绿实心、收藏选中变黄实心
---------------------------------------------------------------------------------
-===== 2026-08-09 =====
-类型：修复
-内容：意图路由改为「以提问为准」——上传非法律文档 + 无法律词提问（如「文档内容说了什么」）此前因「携带文档强制 legal_qa」+ 文档文本关键词扫描误判（技术日志含「法条」等词即判涉法）而走法律流程：RAG 注入无关法条、强制三段式、生成评估详情。修复：classify_intent 签名 has_documents → user_documents，判定只看提问（提问含法律关键词 → legal_qa；提问无法律词 + 携带文档 → general_non_legal 文档分析模式）；非法律分支注入文档全文（修复 context_docs=None 丢弃文档的根源结构）+ 用文档分析提示词（不套三段式、不罗列法条、结尾引导法律咨询）；get_system_prompt 的 document_mode 判定前置；删除 _is_document_analysis。前端零改动（general_non_legal 自动不生成评估详情）。新增 pytest 单测（tests/test_intent_router.py 9 例 + tests/test_qwen_prompts.py 5 例）保护路由与提示词选择
-涉及文件：src/pipeline/intent_router.py, src/pipeline/answer_pipeline.py, src/llm/qwen_model.py, tests/test_intent_router.py（新增）, tests/test_qwen_prompts.py（新增）, tests/conftest.py（新增）, requirements.txt
-验证：pytest 14 例全过；集成脚本三场景 PASS（非法律文档+通用提问 → general_non_legal/文档分析提示词/注入文档/无 RAG/无评估 meta；合同+法律提问 → legal_qa 不变；纯法律提问不变）+ 真实生成一次回答「该文档为技术类开发日志，不涉及具体法律分析」要点总结 + 结尾引导法律咨询、无三段式；demo.py 法律提问回归三段式 + 六维评估正常；浏览器强刷后回归清单（非法律文档 → 无评估详情入口）
---------------------------------------------------------------------------------
-===== 2026-08-09 =====
-类型：修复
-内容：三个 bug——1) 非法律问题回答气泡下方永久显示「引用核验中…」：onMeta 无条件写入 verification_status=pending，但 onDone 的 non_legal 分支合并 meta 时未清除该状态（旁边的「RAG 未命中」分支已清除）。修复：non_legal 分支补 verification_status: undefined（后端对非法律回答本就不启动核验任务）；2) Auto 模型回答时气泡下方 Auto 显示千问 logo：modelBadgeLogo 按后端解析后的实际 model_id 映射品牌 logo。修复：requested_model==='auto' 时与模型选择器一致显示星光渐变图标（SparklesOutline，不绑定任何品牌）；3) 「新建会话」两个示例问题非三段式——根因一：意图路由关键词表缺「借贷/借款/贷款/利率/利息/债务/欠款/担保/抵押/定金/彩礼/遗嘱/遗产」，「民间借贷利率的合法上限是多少？」被误判为 general_non_legal 走通用回复（问题本身是标准法律问题，程序漏词）；根因二：查询重写器对「离婚」类提问生成扩展查询「离婚 夫妻共同财产 子女抚养」，命中财产分割条款相关度（74-77%）高于用户原话命中的冷静期条款（民法典第1077条，66%），多查询结果按相关度全局排序把 1077 挤出 top-5 → 模型「检索不到法条依据」。修复：_retrieve_articles 改为逐查询合并（主查询=用户原话改写优先，扩展查询按序补位，跨查询按法律名+条号去重，提取为可单测的 _merge_query_results）。两个示例问题均保留（验证为程序问题而非问题本身不涉法）
-涉及文件：web/frontend/src/views/ChatView.vue, web/frontend/src/components/chat/ChatMessage.vue, src/pipeline/intent_router.py, src/pipeline/answer_pipeline.py, tests/test_intent_router.py, tests/test_retrieval_merge.py（新增）
-验证：pytest 19 例全过（新增关键词 1 例 + 合并策略 4 例）；demo.py 两问题真实生成——「民间借贷利率的合法上限是多少？」：intent=legal_qa、检索到民法典 680/674/670 等借款条款、三段式 + 六维评估 84.1 高可信；「离婚冷静期是多长时间？」：检索第一名即 1077 冷静期条款（66%）、回答「离婚冷静期为30日」+ 三段式 + 六维评估 82.3 高可信；npm run build 零类型错误；重启后端后浏览器回归（非法律提问不再显示「引用核验中…」；Auto 回答角标为星光图标；两个示例问题均三段式）
---------------------------------------------------------------------------------
-
---------------------------------------------------------------------------------
-===== 2026-08-10 =====
-类型：新增功能
-内容：智能体功能第一阶段——1) src/config.py 新增智能体配置段：AGENT_ENABLE_TOOLS（工具调用开关，仅 API 引擎生效）、AGENT_MAX_TOOL_ROUNDS（最大工具轮次防死循环）、AGENT_DECISION_MAX_TOKENS（每轮工具决策最大 token）、AGENT_TOOL_ARG_MAX_LEN（工具参数长度上限）；2) src/llm/base.py 新增模型层工具契约：ToolCall（id/name/arguments + to_dict）与 ToolDecision（text + tool_calls 默认空列表）两个 dataclass，BaseLLMModel 追加三个抽象方法 complete_with_tools / complete_stream_with_tools（yield ("text", str) 文本块 + 流末 ("tool_calls", List[ToolCall]) 事件；本地引擎抛 NotImplementedError）与 generate_stream_messages（按原始消息列表流式生成）。本任务仅定义契约，实际逻辑由后续任务实现
-涉及文件：src/config.py, src/llm/base.py, tests/test_model_tool_contract.py（新增）
-验证：pytest tests/test_model_tool_contract.py -q → 3 passed（先确认失败 ImportError 再实现后通过）；全量 pytest tests/ -q → 22 passed 无回归；提交 832a4ae
-
-===== 2026-08-10 =====
-类型：新增功能
-内容：智能体功能第二阶段——任务调度器（src/agents/task_scheduler.py）：把 legal_qa 意图细分为 legal_qa / contract_review / validity_check 三种任务类型，确定性规则分类（不用大模型，快稳便宜可解释），回退安全（规则不命中一律落回 legal_qa，最坏情况=现状不退化）。时效查询法律名动态取自 data/law_registry.json（不硬编码废止清单）；合同审查区分「携带文档+审查信号」（0.85）与「无文档强个人审查意图」（0.8，输出引导上传）。新增 pytest 单测 8 例（tests/test_task_scheduler.py），其中 test_registry_driven_law_names 用临时注册表写入「专利法」验证不硬编码。src/agents/__init__.py 为空文件
-涉及文件：src/agents/__init__.py（新增）, src/agents/task_scheduler.py（新增）, tests/test_task_scheduler.py（新增）
-验证：先确认失败（ModuleNotFoundError: No module named 'src.agents'）再实现；tests/test_task_scheduler.py -q → 8 passed；全量 pytest tests/ -q → 30 passed 无回归；提交 1d1ffb3
-
-===== 2026-08-10 =====
-类型：修复
-内容：任务调度器审查修复（协调者复查反馈 3 项 + 连带 1 项）——1) 无文档合同审查正则收紧：_CONTRACT_REVIEW_NO_DOC_RE 去掉裸「条款」命中（「劳动合同试用期条款违法怎么办？」此前误判合同审查），改为审查动词约束（帮我审/审一下/帮忙审/帮我看看.*合同协议/合同协议.*审查风险把关）；2) 携带文档分支去裸词：_CONTRACT_REVIEW_RE 去掉裸「风险/条款/合规」，要求与合同协议词或审查动词共现（上传判决书问「有什么风险」不再误判）；3) classify_task 入口加强制 intent 守卫（intent.intent != legal_qa → 直接返回 legal_qa，docstring 承诺落地为代码）；4) 连带发现：I3 守卫暴露意图路由漏词——「婚姻法」「专利法」不在 _LEGAL_KEYWORDS，导致「婚姻法现在还有效吗？」被判 general_non_legal、「专利法还有效吗？」被判寒暄（len≤8），时效查询在真实调用链上不可达，intent_router 补「婚姻」「专利」两词根（与表内「继承」「侵权」风格一致）；测试同步追加 3 例保护（I1/I2/I3 各一），既有 8 例与 3 例合同测试全部保持通过
-涉及文件：src/agents/task_scheduler.py, src/pipeline/intent_router.py, tests/test_task_scheduler.py
-验证：追加测试先确认失败（3 failed, 8 passed）再修复；tests/test_task_scheduler.py -q → 11 passed；全量 pytest tests/ -q → 33 passed 无回归（test_intent_router.py 9 例不受影响）；冒烟验证 8 个边界场景全部符合预期；本轮未提交 git（待协调者复查后统一提交）
-
-===== 2026-08-10 =====
-类型：修复
-内容：意图路由补词收尾（协调者复查确认）——上一轮只补「婚姻」「专利」，注册表 9 部废止法律中「收养法」「物权法」仍漏判（「收养法还有效吗？」会被判 general_non_legal、时效查询功能不可达）。_LEGAL_KEYWORDS 追加「收养」「物权」，与「婚姻」「专利」同一注释块（废止法律时效查询场景）。核对 tests/test_intent_router.py 9 例无相关断言、无冲突
-涉及文件：src/pipeline/intent_router.py
-验证：全量 pytest tests/ -q → 33 passed 无回归；冒烟：收养法/物权法/婚姻法时效查询真实链均 intent=legal_qa → validity_check 且 law_name 正确回传；提交 06bc39c（本轮修改日志由 Task 12 统一提交，未纳入该提交）
-
-===== 2026-08-10 =====
-类型：新增功能
-内容：智能体功能 Task 4——合同审查管线 + 文档引文核验。1) 新增 src/citation_verifier/document_quotes.py：DocumentQuoteVerifier 纯字符串逐字比对回答中引用的用户文档原文（「…」/“…”/《…》三种引号样式，文档条款信号词过滤法条名误报），输出 document_quote_checks（text/found/verdict/in_document），防止模型编造合同条款被误当文档事实；2) CitationVerifier.verify 增加 user_documents 参数，报告新增 document_quote_checks 键（无文档时为 None）；3) qwen_model 新增 _SYSTEM_PROMPT_CONTRACT 合同审查专用提示词（【合同风险清单】+【总体评价】结构，要求引号内逐字复述文档原文、仅引用参考法条），get_system_prompt("contract_review") 分支；4) answer_pipeline run() 内三处 verify 调用与 run_verification 一处统一传 user_documents。实测发现（简报之外）：百炼模型引号输出风格为弯引号“…”而非「…」，简报原始引号样式会漏检（真实回答 document_quote_checks 恒为空），已追加弯引号样式 + 单测保护。真实 API 集成验证：上传含试用期/工资/违约金条款的合同 txt → /api/documents/extract → /api/chat 带 user_documents → 回答含【合同风险清单】【总体评价】结构，document_quote_checks 正确核出 3 条文档原文（verified）+ 法条原文等非文档引文（document_mismatch）
-涉及文件：src/citation_verifier/document_quotes.py（新增）, src/citation_verifier/citation_verifier.py, src/llm/qwen_model.py, src/pipeline/answer_pipeline.py, tests/test_document_quotes.py（新增）, tests/test_qwen_prompts.py
-验证：严格 TDD——先写失败测试（ModuleNotFoundError 与断言失败）再实现；tests/test_document_quotes.py + tests/test_qwen_prompts.py → 12 passed；全量 pytest tests/ -q → 54 passed 无回归；真实 API 集成验证通过（任务类型 contract_review、风险清单结构、document_quote_checks 3 verified）；提交见 Task 4 报告
-
-===== 2026-08-10 =====
-类型：新增功能
-内容：智能体功能 Task 5——工具注册表与执行器（src/agents/tools.py）：2 个 function calling 工具 schema（search_articles 检索法条 / check_law_validity 查询时效）+ execute_tool 统一分发入口；参数清洗（去空白、剔控制字符、截断至 AGENT_TOOL_ARG_MAX_LEN=100）；search_articles 走向量检索（相关度阈值过滤 + article_key 去重）；check_law_validity 走 LawValidityService.check_citation；未知工具/空参数返回错误结果不抛异常
-涉及文件：src/agents/tools.py（新增）, tests/test_tools.py（新增）
-验证：严格 TDD——先确认失败（ModuleNotFoundError）再实现；tests/test_tools.py -q → 6 passed；全量 pytest tests/ -q → 39 passed 无回归；提交 0fe6e83（本轮修改日志由 Task 12 统一提交，未纳入该提交）
-
-===== 2026-08-10 =====
-类型：新增功能
-内容：智能体功能 Task 6——模型层工具调用实现：api_client 新增 complete_with_tools（非流式工具决策，temperature 固定 0.0，tool_calls 参数 JSON 解析容错）与 complete_stream_with_tools（流式决策，重试语义与 complete_stream 一致）；qwen_model 新增 supports_tools / complete_with_tools / complete_stream_with_tools（本地引擎抛 NotImplementedError）与 generate_stream_messages（按原始消息列表流式生成）；连带修复 _resolve_model 对 provider=="local" 合成 local ModelSpec（本地分支实际不可达的既有 bug）
-涉及文件：src/llm/api_client.py, src/llm/qwen_model.py, tests/test_model_tools.py（新增）
-验证：严格 TDD——实现前 5 failed 确认失败；实现后 tests/test_model_tools.py + tests/test_qwen_prompts.py → 10 passed；全量 pytest tests/ -q → 44 passed 无回归；提交 7547ce8（本轮修改日志由 Task 12 统一提交，未纳入该提交）
-
-===== 2026-08-10 =====
-类型：新增功能
-内容：智能体功能 Task 7——工具循环引擎：src/agents/trace.py 定义 ToolTraceStep（step/tool_name/arguments/result_summary/success/cost_ms）与 AgentStatusEvent（running/done/error/generating）；src/agents/agent_loop.py 的 AgentToolLoop 实现流式/非流式工具循环（上限 AGENT_MAX_TOOL_ROUNDS=3，每轮决策 token 上限 512）：工具决策轮 yield 状态事件、最终回答轮流式输出；NotImplementedError（本地引擎）自动降级普通生成；轮次耗尽/工具失败兜底不中断、失败步骤记录进轨迹；工具检索结果还原为 Document（元数据含 law_name/article_num/status 等 6 键，供核验合并）；审查修复：降级路径累积 answer（I-1，run() 不再返回空回答）
-涉及文件：src/agents/trace.py（新增）, src/agents/agent_loop.py（新增）, tests/test_agent_loop.py（新增）
-验证：严格 TDD——先确认失败（ModuleNotFoundError）再实现，修正简报 2 处矛盾后 tests/test_agent_loop.py -q → 6 passed；全量 pytest tests/ -q → 60 passed 无回归；提交 68a1fbf（本轮修改日志由 Task 12 统一提交，未纳入该提交）
-
-===== 2026-08-10 =====
-类型：新增功能
-内容：智能体功能 Task 8——流水线与 SSE 集成。1) src/knowledge_base/retrieval_utils.py 新增 merge_unique_docs（工具检索结果按（法律名,条号）去重并入初始检索结果）；2) answer_pipeline.run() 新增 agent_tools 参数：开启且模型支持函数调用且任务为 legal_qa 时走 AgentToolLoop（惰性导入规避循环引用：agent_loop 顶部回引本模块 PipelineContext），返回字典追加 task / tool_trace；3) web/backend/main.py SSE 端点新增智能体分支：meta 之后按 use_agent 判断走 loop.stream，工具状态以 agent_status 事件推送，done 事件追加 task / validity_evidence / tool_trace（工具检索到的法条并入 ctx.retrieved_docs 供后台引用核验使用）；4) schemas.ChatResponse 追加 tool_trace 可选字段（task / validity_evidence 为 Task 3 已有）
-涉及文件：src/pipeline/answer_pipeline.py, src/knowledge_base/retrieval_utils.py, web/backend/main.py, web/backend/schemas.py, tests/test_retrieval_merge.py
-验证：严格 TDD——新用例先确认失败（ImportError）再实现；全量 pytest tests/ -q → 61 passed 无回归；真实 API 集成验证四场景：多法条问题（glm-5.2）触发 9 次 agent_status、tool_trace 非空、三段式回答；普通问题零回归（无 agent_status、tool_trace 空）；时效快路径 meta/done 均带 validity_evidence、回答不套三段式；同步 /api/chat 返回 tool_trace 数组与 task。简报之外发现：默认模型 qwen3.7-plus 在当前 legal_qa 系统提示词下不主动调用工具（模型自主决策，流式/非流式 API 契约经强制指令探测均正常），kimi 轮次耗尽兜底偶发空回答（Task 7 循环逻辑边界）
-
-===== 2026-08-10 =====
-类型：新增功能
-内容：智能体功能 Task 9——前端 SSE agent_status 消费与生成中状态行 + 时效来源标注。1) types.ts 新增 AgentStatusEvent / ToolTraceStep 接口，MessageMeta 追加 task_type / tool_trace / validity_evidence / agent_status（瞬态），DoneEvent / MetaEvent 追加 task_type / validity_evidence / tool_trace，SSEEventMap 追加 agent_status 事件；2) useChatStream 新增 onAgentStatus 回调与事件分发；3) ChatView 接线：onAgentStatus 把最新工具状态写入消息 meta（展开合并），onMeta / onDone 三分支（non_legal / trust / else）/ onFallback 同步降级路径统一落盘 task_type / validity_evidence / tool_trace 并清理瞬态 agent_status；4) ChatMessage 在回答内容上方渲染智能体状态行（● 正在检索法条…→✓ 命中 N 条法条，done 后消失）与时效查询来源标注（◈ 来源：法律时效注册表）。简报之外发现：后端 meta/done/同步响应均只发嵌套 task 对象（task.task_type）而无顶层 task_type 字段，取值处做双源兼容（meta.task_type ?? meta.task?.task_type），保证 meta.task_type 一定落盘（Task 10 依赖）
-涉及文件：web/frontend/src/api/types.ts, web/frontend/src/composables/useChatStream.ts, web/frontend/src/views/ChatView.vue, web/frontend/src/components/chat/ChatMessage.vue
-验证：npm run build vue-tsc 零类型错误；真实 API 三场景（glm-5.2 多法条问题触发 9 次 agent_status + tool_trace 4 步；「你好」无 agent_status；「婚姻法现在还有效吗？」meta/done 均带 validity_evidence）；/ui/ 新产物 200；验证完毕已停服务；提交见 Task 9 报告（本轮修改日志由 Task 12 统一提交，未纳入该提交）
-===== 2026-08-10 =====
-类型：新增功能
-内容：智能体功能 Task 10——工具轨迹面板与文档引文核验展示。1) 新建 web/frontend/src/components/detail/ToolTracePanel.vue：详情面板「工具轨迹」tab 内容，展示每轮工具名/成功失败/参数 JSON/结果摘要/耗时（key 用 step-tool_name，同轮多工具 step 重复为已知设计）；2) DetailBody 接入：tabs 区在有 tool_trace 时条件显示「工具轨迹」tab，内容区顺序改 v-if trust / v-else-if articles / v-else-if trace / v-else verification（verification 保持兜底），detailPanel store 的 DetailTab 类型追加 trace；3) CitationVerificationPanel 展示文档引文核验：types.ts 的 CitationVerification 补 document_quote_checks 类型（text/found/verdict/in_document），「无数据」判断同时考虑 docQuotes，显式引用卡片后追加「文档引文核验」区块（verified → 与上传文档原文一致 / 其他 → 未找到，warning 样式）
-涉及文件：web/frontend/src/components/detail/ToolTracePanel.vue（新增）, web/frontend/src/components/detail/DetailBody.vue, web/frontend/src/components/detail/CitationVerificationPanel.vue, web/frontend/src/api/types.ts, web/frontend/src/stores/detailPanel.ts, web/frontend/dist
-验证：npm run build vue-tsc 零类型错误（首轮 2 错：DetailTab 缺 trace、meta 可能 undefined，已修）；真实 API 三场景——① glm-5.2「工伤认定申请时效和劳动仲裁时效分别是多少？」触发 9 次 agent_status、done.tool_trace 4 步全 success（step 号跨工具重复、args/result_summary/cost_ms 齐全）；② 合同 txt + 「这份合同有什么风险条款？」task=contract_review，document_quote_checks 11 条（verified 原文一致与 document_mismatch 未找到混合，WS 核验路径经 ctx.user_documents 确认同链路）；③ 普通问题 tool_trace 为空 → trace tab 隐藏；/ui/ 新产物 200 且 bundle 含新组件；验证完已停服务；提交 a832200（本轮修改日志由 Task 12 统一提交，未纳入该提交）
-
-===== 2026-08-10 =====
-类型：新增功能
-内容：智能体功能 Task 11——效果对比评测：新增 data/benchmark/agent_compare.json（10 道对比题：7 道带 gold_law/gold_article 法条题 + 3 道时效类题）；run_legal_trust_benchmark.py 新增 --mode agent（pipeline.run 传 agent_tools=True，rows 追加 tool_call_count / elapsed_ms，trust 取值 None 判空保护，summary 追加 avg_tool_calls）；真实对比跑：full avg_trust 83.29 vs agent 83.2、gold_citation_recall 0.7 vs 0.7（零回归）；默认模型 qwen3.7-plus 对 10 道单轮题未触发工具调用（avg_tool_calls=0.0，属预期内的可能结果，如实记录）
-涉及文件：data/benchmark/agent_compare.json（新增）, scripts/run_legal_trust_benchmark.py, data/benchmark/report_full.json, data/benchmark/report_agent.json
-验证：mock 冒烟 --mode agent --mock 报告生成（avg_tool_calls=0.0）；真实模式 full/agent 各 10 题对比跑通过（首跑网络中断重试后成功，validity 题走废止核验路径无崩溃）；pytest tests/ -q → 63 passed 无回归；提交 e33e96e（本轮修改日志由 Task 12 统一提交，未纳入该提交）
-
-===== 2026-08-10 =====
-类型：新增功能
-内容：智能体（Agent）能力落地——任务调度器（合同审查管线输出结构化风险清单 + 文档引文核验；时效查询管线直查注册表出确定性结论）；工具调用引擎（检索法条 / 查询时效 2 个工具，循环上限 3 轮，SSE agent_status 状态事件，前端工具轨迹面板）；effect 对比评测（--mode agent）
-涉及文件：src/agents/（task_scheduler/tools/agent_loop/trace）、src/llm/（base/api_client/qwen_model）、src/pipeline/answer_pipeline.py、src/citation_verifier/（document_quotes + verify 扩展）、web/backend/（main.py/schemas.py）、web/frontend/（types/useChatStream/ChatView/ChatMessage/ToolTracePanel/DetailBody/CitationVerificationPanel）、scripts/run_legal_trust_benchmark.py、data/benchmark/agent_compare.json
-验证：pytest 全绿；npm run build 零类型错误；三类问题（多法条/合同/时效）真实 API 集成验证通过；对比报告产出
-
-===== 2026-08-10 =====
-类型：修复 / 优化
-内容：最终审查波合并前小修复。1) 无文档合同审查礼貌引导（F-1）：answer_pipeline 在 task=contract_review 且无 user_documents 时短路返回固定引导文案「请上传合同文件后再提问……」，run() 与 prepare_context 两处零 LLM 调用（新增 PipelineContext.short_circuit_text 字段 + generate_answer_stream 开头短路直出，SSE 流式路径同样不调模型）；2) ToolTracePanel 轨迹 key 追加索引防同轮同工具碰撞（F-2）；3) 判决书 + 泛用风险词用例钉住 I2 正则（F-3）；4) tools.py：store=None 时 search_articles 返回「检索服务不可用」+ 工具描述去掉「指定法律名称可提高精度」改为「可选，指定缩小范围」（描述与实现一致）（F-4）；5) CLAUDE.md 与指南 8.2 声明 Web 端离线调用暂缓（F-5）；6) .gitignore 忽略 data/benchmark/mock_*.json（F-6）
-涉及文件：src/pipeline/answer_pipeline.py, tests/test_contract_guidance.py（新增）, web/frontend/src/components/detail/ToolTracePanel.vue, tests/test_task_scheduler.py, src/agents/tools.py, CLAUDE.md, docs/项目改进指南.txt, .gitignore, web/frontend/dist
-验证：pytest tests/ -q → 66 passed（63 + 合同引导 3 条新增 + I2 钉住 1 条，原 63 条含新增前基线）；npm run build vue-tsc 零类型错误；提交见最终审查波提交
-===== 2026-08-11 =====
-类型：新增功能
-内容：多用户账号体系（改进指南阶段三落地 + 扩展）——①修复登出 bug：旧版登出先清空会话数据（sessions.$reset）且异步登出未 await 导致路由守卫弹回、需点两次才退出，现改为先 await 登出再跳转且登出不再清数据；②服务端会话管理：新建 user_store.py（pbkdf2 哈希密码 + 每用户 API Key + 种子账号 root/user1/user2）、session_manager.py（Token 24h TTL 滑动续期 + JSON 持久化 + 多端共存）、user_data.py（每用户会话/收藏/资料 JSON 读写）；③新增注册接口 /api/auth/register（用户名+密码，规则校验、重名 409、成功自动登录）与用户数据接口 /api/user/data、/api/user/profile；④每用户 API Key 透传：ChatRequest 增加可选 token，后端解析用户自配 Key 沿 pipeline→model→api_client 全程透传（按 (base_url, api_key) 缓存客户端，并发不串 Key），未配置回退服务端 .env Key（root 默认）；⑤前端：登录页注册模式 + 测试账号提示、useSync.ts 双写同步（登录拉取恢复/3 秒防抖整包提交/首次登录本地回写迁移）、设置面板 API Key 输入、聊天请求携带 token
-涉及文件：新建 web/backend/user_store.py, session_manager.py, user_data.py, web/frontend/src/api/user.ts, composables/useSync.ts；修改 web/backend/main.py, schemas.py, src/config.py, src/llm/qwen_model.py, src/agents/agent_loop.py, src/pipeline/answer_pipeline.py, src/uncertainty/self_consistency.py, web/frontend/src/{api/auth.ts,api/types.ts,stores/auth.ts,stores/sessions.ts,views/LoginView.vue,components/layout/AppHeader.vue,components/common/SettingsModal.vue,App.vue,router/index.ts}, .gitignore, docs/法信通_LawTrust_项目介绍.txt, README.md
-验证：后端接口集成测试（登录/注册/409/400/401/数据存取/登出吊销/重启恢复/多端共存）+ 真实服务端到端（root 问答、新用户回退服务端 Key、自配 Key 问答、无效 Key 报中文错误、清空 Key 恢复、登出后重登数据恢复、流式 SSE 带 token）+ 前端 npm run build 通过
-===== 2026-08-11 =====
-类型：新增功能
-内容：设置面板精简与功能扩充——①删除三处说明文字（模型价格/能力小字、API Key 四行说明、底部 Auto 提示框），界面简洁化；②API Key 输入框占位符改为 Key 形式（sk-*******）；③设置面板分区重构为「问答偏好 / 模型与 API Key / 账户 / 关于」四区：新增 NLI 引用核验开关与自一致性采样次数（2/3/5，此前 store 有字段无界面）；新增修改密码（校验旧密码、重哈希、吊销该用户其他设备 Token，当前设备保持登录）；新增清空全部个人数据（二次确认，清会话/收藏/资料，保留账号与 API Key）；新增关于区块（账号/模型数/离线引擎/服务与法律库状态）
-涉及文件：web/backend/main.py, web/backend/schemas.py, web/backend/session_manager.py（新增 revoke_others）, web/backend/user_store.py（新增 change_password）, web/backend/user_data.py（新增 clear_user_data）, web/frontend/src/components/common/SettingsModal.vue（分区重构）, web/frontend/src/api/auth.ts, web/frontend/src/api/user.ts
-验证：后端单元自测（change_password/revoke_others/clear_user_data）+ 真实接口测试（旧密码错 400/新密码短 400/改密踢其他设备且当前保持/新密码登录/清空后数据为空且 Key 保留/未登录 401）+ 前端 npm run build 通过 + 服务重启为干净种子账号状态
-
+================================================================================
+
+                        律策智枢 LawPilot — 修改日志
+
+================================================================================
+
+
+
+规则：每次修改功能或修复 Bug 后，按以下格式在文件末尾追加一条记录。
+
+
+
+--------------------------------------------------------------------------------
+
+===== YYYY-MM-DD =====
+
+类型：新增功能 / 修复 / 优化
+
+内容：一句话说明改动
+
+涉及文件：xxx.py, yyy.html
+
+验证：说明验证方式（命令或操作步骤）
+
+--------------------------------------------------------------------------------
+
+===== 2026-08-04 =====
+
+类型：新增功能
+
+内容：LLM 双模式改造——默认走阿里云百炼 qwen3.7-plus API（OpenAI 兼容），保留本地 Qwen2.5-7B 推理可切换（LLM_PROVIDER=local）；新增 api_client.py（重试/超时/流式解析/错误分类）、config 新增 API 配置项、.env 管理 DASHSCOPE_API_KEY；bge/NLI 小模型保持本地，API 模式无需 GPU
+
+涉及文件：src/config.py, src/llm/api_client.py, src/llm/qwen_model.py, src/uncertainty/logits_entropy.py, requirements.txt, .env.example, .gitignore
+
+验证：python scripts/demo.py --query "劳动合同解除需要提前多少天通知？"（API 模式输出三段式回答+引用核验）；LLM_PROVIDER=local 回归本地模式；python scripts/run_server.py 浏览器流式问答
+
+--------------------------------------------------------------------------------
+
+===== 2026-08-04 =====
+
+类型：修复
+
+内容：demo.py 在 Windows cmd（GBK 终端）打印 ✓/✗ 等 Unicode 字符时 UnicodeEncodeError 崩溃，改为 stdout/stderr 按 UTF-8 输出（errors=replace 兜底）；核验-重生成闭环验证通过（API 模式自动修正 1 次）
+
+涉及文件：scripts/demo.py
+
+验证：python scripts/demo.py --query "劳动合同解除需要提前多少天通知？" 完整输出引用核验与六维可信评估，不再崩溃
+
+--------------------------------------------------------------------------------
+
+===== 2026-08-04 =====
+
+类型：新增功能
+
+内容：阶段九一键部署与团队测试——新增 start_server.bat（检查依赖/知识库/API Key/小模型后启动服务）与 start_tunnel.bat（检测 cpolar/ngrok 自动建隧道，未安装则打印教程）；前端同源架构确认（相对路径 fetch + WebSocket 自动 wss），测试人员零安装仅需浏览器访问公网 URL；不实施指南 9.4 client_connect.bat 与 9.5 配置管理（同源架构不需要）
+
+涉及文件：start_server.bat, start_tunnel.bat, README.md, CLAUDE.md, docs/律策智枢_LawPilot_项目介绍.txt
+
+验证：双击 start_server.bat 启动服务后浏览器 localhost:6006 登录；安装 cpolar 后双击 start_tunnel.bat，手机流量访问公网 URL 提问（流式回答 + 引用核验面板更新）
+
+--------------------------------------------------------------------------------
+
+===== 2026-08-05 =====
+
+类型：新增功能
+
+内容：前端架构迁移 M0——搭建 Vite + Vue 3 (script setup) + TypeScript + Tailwind CSS v4 + Naive UI + Pinia 工程骨架；旧单文件 index.html 归档至 web/frontend/legacy/（可回退）；完成设计系统（品牌蓝 @theme 令牌 + 亮暗双主题，settings store 一键联动 Tailwind 与 Naive UI darkTheme）；三栏布局骨架（AppHeader/SessionSidebar/DetailPanel）+ 登录页静态版；后端静态挂载改为三级回退（dist → legacy → frontend）；生产 base 配置 /ui/ 解决资源 404
+
+涉及文件：web/frontend/（package.json, vite.config.ts, index.html, src/* 全部新文件）, web/backend/main.py, docs/修改日志.txt
+
+验证：npm run build 零类型错误；后端 6006 服务 /ui/ 返回新前端（JS/CSS 资源 200）；/figure/sign.png 200；npm run dev 起 5173，/api 代理连通 /api/health 返回 ok；暗色切换按钮可用
+
+===== 2026-08-05 =====
+
+类型：新增功能
+
+内容：前端架构迁移 M1——完成 API 层（client.ts 错误归一三种 detail 形态 / types.ts 与后端 schemas.py 对齐 / auth/chat/misc 接口封装）、auth store（登录态持久化 lawtrust_auth_v2 + v1 数据静默迁移）、sessions store（会话/消息 CRUD + 按用户名隔离持久化 + v1 迁移 + 自动标题）、useChatStream（SSE 解析 + 失败自动降级 /api/chat + AbortController 取消）、useVerificationWS（核验推送连接管理）、登录页完整化（协议弹窗 + 路由守卫 + 刷新保持登录）、ChatView 问答全流程（check-input 三分支：正常/隐私确认弹窗/安全拒答 + 流式打字光标 + Markdown 章节渲染 + 消息操作栏占位）、MarkdownRenderer（markdown-it + DOMPurify 双保险）
+
+涉及文件：web/frontend/src/（api/*, stores/*, composables/*, components/chat/*, components/common/MarkdownRenderer.vue, views/*, utils/*, router/index.ts, App.vue, main.ts）
+
+验证：npm run build 零类型错误；dev 联调全链路——登录 root/123456 返回 token、check-input 正常/含手机号(needs_privacy_confirm)/伪造合同(refused) 三分支正确、/api/chat/stream 流式事件序列 meta→124×token→done 完整
+
+===== 2026-08-05 =====
+
+类型：新增功能
+
+内容：前端架构迁移 M2——会话管理完整化：侧栏会话列表支持重命名（RenameModal 弹窗）、删除（n-popconfirm 确认）、清空所有会话（n-dialog 警告确认）、会话时间显示（今天/昨天/日期）、AI 消息标题行（律策智枢 LawPilot + TrustBadge 可信分角标：核验中呼吸点 → 流式快速评分 → 完成三色徽章（高/中/低）+ 废止法条警告）；sessions store 持久化改为 userScopedStorage 自定义 storage（解决 pinia-plugin-persistedstate v4 key 只求值一次导致多用户名 key 不更新的问题）
+
+涉及文件：web/frontend/src/components/layout/SessionSidebar.vue, web/frontend/src/components/chat/ChatMessage.vue, web/frontend/src/components/chat/TrustBadge.vue, web/frontend/src/components/common/RenameModal.vue, web/frontend/src/stores/sessions.ts, web/frontend/src/utils/answer.ts
+
+验证：npm run build 零类型错误（vue-tsc 全量检查）
+
+===== 2026-08-05 =====
+
+类型：新增功能
+
+内容：前端架构迁移 M3——右侧详情面板完整化：新增 detailPanel store（selectedMsgId/activeTab/isOpen，不持久化，meta 直接引用 sessions 消息对象，WS 推送自动刷新面板）；点击 AI 法律类回答气泡选中/取消（选中高亮边框）；可信评估面板（SVG 总分环 + 等级徽章 + 建议 + 弱维度标签 + 加权贡献分解条 + ECharts 雷达图（按需引入 echarts/core，暗色主题适配，点击维度展开审计）+ 六维列表（展开态：核验状态/摘要/检查 chips/公式审计/跳转引用核验按钮/完整审计说明折叠））；法条溯源面板（法条卡片 + 相关度百分比 + 现行有效/已废止标签（废止标红 + 参见新法）+ 展开全文）；引用核验面板（核验中提示 → 显式引用对比卡片（模型论述摘录 vs 法条对照原文 + 裁决/吻合度/是否在检索结果内）+ 隐性论断（有法律支撑/支撑不足）+ 汇总说明 + 自动修正次数）；移动端抽屉化（桌面 xl 常驻侧栏，移动端 n-drawer 抽屉 + 顶栏 📊 入口按钮）
+
+涉及文件：web/frontend/src/stores/detailPanel.ts, web/frontend/src/components/detail/*（DetailBody/TrustEvalPanel/RadarChart/ArticleTracePanel/CitationVerificationPanel）, web/frontend/src/components/layout/DetailPanel.vue, web/frontend/src/components/chat/ChatMessage.vue, web/frontend/src/components/layout/AppHeader.vue, web/frontend/src/api/types.ts
+
+验证：npm run build 零类型错误；dev 5173 HMR 生效
+
+===== 2026-08-05 =====
+
+类型：修复
+
+内容：修复界面被压缩在上半部分、下半页空白的布局 bug——根因是 html/body/#app 未设置 height:100%，子级 h-full 高度链塌陷成内容高度；在 main.css 补全局高度链。同时补齐右上角个人中心缺失的功能（迁移遗漏）：用户菜单完整化（下拉头部显示头像/昵称/账号 + 个人资料 / 我的收藏 / 清空对话记录 / 退出登录四项）；新增 ProfileModal（头像 8 色选择 + 自定义头像上传 ≤1MB + 显示名称 + 个人简介，auth store 新增 updateProfile 持久化到 lawtrust_auth_v2）；新增 favorites store（收藏快照含 meta，按用户名隔离持久化 lawtrust_favorites_v2_xxx + v1 数据迁移）与 FavoritesModal（列表/编辑标题备注/删除）；ChatMessage 底部操作栏加 ☆ 收藏按钮；userScopedStorage 提取到 utils/storage.ts 供 sessions/favorites 共用；登录与路由守卫加载收藏数据
+
+涉及文件：web/frontend/src/assets/styles/main.css, web/frontend/src/components/layout/AppHeader.vue, web/frontend/src/components/common/ProfileModal.vue, web/frontend/src/components/common/FavoritesModal.vue, web/frontend/src/stores/favorites.ts, web/frontend/src/stores/auth.ts, web/frontend/src/stores/sessions.ts, web/frontend/src/utils/storage.ts, web/frontend/src/components/chat/ChatMessage.vue, web/frontend/src/router/index.ts, web/frontend/src/views/LoginView.vue
+
+验证：npm run build 零类型错误；dev 5173 与生产 6006 /ui/ 均 200 且服务最新构建
+
+===== 2026-08-05 =====
+
+类型：修复
+
+内容：界面压缩 bug 的真正修复——先前猜测 html/body/#app 缺高度是错的（base.css 本就有 height:100%）；真根因是 Naive UI 三个 provider（n-config-provider/n-message-provider/n-dialog-provider）包裹层高度为 auto，h-full 百分比高度链在中间断链导致布局塌缩成内容高度。ChatView/LoginView 根 div 改用 h-screen（100vh，不依赖父级高度）。同时登录协议弹窗重建为旧版交互：小弹窗「欢迎使用律策智枢 LawPilot」+ 三个可点开文档的协议链接（《用户协议》《隐私政策》《AI 咨询非正式法律意见》声明，LEGAL_DOCS 真实简短条款）+ 勾选 checkbox 后「同意并继续」按钮才可用 + 独立文档查看弹窗
+
+涉及文件：web/frontend/src/views/ChatView.vue, web/frontend/src/views/LoginView.vue
+
+验证：npm run build 零类型错误；dev 5173 / 生产 6006 均服务最新构建（需 Ctrl+F5 硬刷新清除浏览器缓存）
+
+===== 2026-08-05 =====
+
+类型：修复
+
+内容：UI 四项问题修复——（1）右上角美化：移动端详情按钮由 emoji 📊 改为 StatsChartOutline 图标 + 「详情」文字；用户菜单按钮由纯头像改为 头像+用户名+下拉箭头 胶囊按钮；下拉菜单「个人资料/我的收藏」等图标统一 16px 灰调（之前默认尺寸偏大不协调）；（2）可信评估自动展示：法律类回答完成后自动在右侧面板显示（detailPanel 新增 autoShow，追问自动切到最新回答，非法律类回答自动关闭面板）；修复桌面端点击回答时移动端抽屉与侧栏重复弹出的冗余窗口（n-drawer 加 xl:hidden 只在移动端弹出）；（3）用户消息加头像（与个人中心设置一致：头像图/首字 + 头像色），消息容器 max-w-3xl 加宽为 max-w-4xl 减小内容与中间栏边缘的留白；（4）run_server.py 启动前预检 6006 端口占用，重复启动给出通俗提示而非裸报错 [Errno 10048]
+
+涉及文件：web/frontend/src/stores/detailPanel.ts, web/frontend/src/views/ChatView.vue, web/frontend/src/components/layout/DetailPanel.vue, web/frontend/src/components/layout/AppHeader.vue, web/frontend/src/components/chat/ChatMessage.vue, web/frontend/src/components/detail/DetailBody.vue, scripts/run_server.py
+
+验证：npm run build 零类型错误；dev 5173 HMR 生效；生产 6006 /ui/ 服务最新 dist（Ctrl+F5 硬刷新）
+
+===== 2026-08-05 =====
+
+类型：优化
+
+内容：详情面板交互优化——（1）删除右上角「详情」按钮（详情已由提问自动展示，按钮多余）；（2）点击 AI 回答不再 toggle 选中（旧行为再点同一消息会清空面板内容，窄屏下抽屉反复弹出灰色遮罩）；selectMessage 改为始终选中并展示，关闭面板统一用面板头部「收起 ✕」按钮（所有尺寸显示，桌面宽屏侧栏可收起）；（3）桌面侧栏改为 v-show 受 isOpen 控制（收起后让出空间），移动端抽屉去掉遮罩（:mask=false，不再盖灰聊天区）
+
+涉及文件：web/frontend/src/components/layout/AppHeader.vue, web/frontend/src/stores/detailPanel.ts, web/frontend/src/components/layout/DetailPanel.vue, web/frontend/src/components/detail/DetailBody.vue
+
+验证：npm run build 零类型错误；dev 5173 HMR 生效（Ctrl+F5 硬刷新）
+
+===== 2026-08-05 =====
+
+类型：修复
+
+内容：详情面板默认常驻显示——根因：侧栏原挂在 xl（1280px）断点，窗口窄于 1280 时右侧栏被 CSS 藏起只剩抽屉（默认收起、带遮罩、无收起入口）。修复：侧栏断点放宽到 lg（≥1024px 常驻显示），detailPanel isOpen 初始改为 true（打开页面即显示详情空态）；抽屉仅保留给 <1024px 手机小屏，且仅选中回答后才弹出、无遮罩；「收起」按钮做成带边框背景的按钮样式并移到「详情」文字左侧，点击收起后侧栏隐藏、聊天区 flex 自适应变宽
+
+涉及文件：web/frontend/src/components/layout/DetailPanel.vue, web/frontend/src/stores/detailPanel.ts, web/frontend/src/components/detail/DetailBody.vue
+
+验证：npm run build 零类型错误；dev 5173 HMR 生效（Ctrl+F5 硬刷新）
+
+===== 2026-08-05 =====
+
+类型：修复
+
+内容：详情面板问题针对性修复（前两轮改动已确认全部在构建产物中，本轮回应用户缓存 + 三处真实缺口）——（1）彻底移除 n-drawer 抽屉：抽屉容器是全屏 fixed 浮层，是灰色阴影、点击拦截、收起后聊天区不变宽的根源；详情改为普通 flex 侧栏所有视口常驻显示（w-72/xl:w-80，v-show 控制），任何宽度下无浮层无遮罩，收起后面板让出空间聊天区自动变宽；（2）进入页面自动展示最近一条法律类回答的评估（ChatView onMounted 查找最后一条法律类消息 autoShow，无则显示空态）；（3）后端 /ui 的 index.html 加 Cache-Control: no-cache（构建后浏览器不再用缓存旧入口加载已删除的旧 JS）
+
+涉及文件：web/frontend/src/components/layout/DetailPanel.vue, web/frontend/src/views/ChatView.vue, web/backend/main.py
+
+验证：npm run build 零类型错误；重启后端后 curl -si localhost:6006/ui/ 返回 200 + cache-control: no-cache，JS hash 与 dist 一致（index-1RR6fhKf.js）；根路径 307 重定向 /ui/index.html；用户需用无痕窗口验证
+
+===== 2026-08-05 =====
+
+类型：优化
+
+内容：收起详情面板后对话内容宽度自适应——根因：消息列表容器写死 max-w-4xl（固定 896px 居中），收起详情后聊天区虽变宽但内容仍锁在 896px（两侧空白变大、内容无变化）。修复：消息列表容器去掉固定最大宽度占满聊天区，气泡宽度改为 min(900px, 88%)（跟随聊天区变宽，900px 封顶保证可读性）；收起/展开详情时对话内容随布局自适应
+
+涉及文件：web/frontend/src/views/ChatView.vue, web/frontend/src/components/chat/ChatMessage.vue
+
+验证：npm run build 零类型错误；6006 服务新构建（index-D1a1f-4G.js）；浏览器收起详情面板后消息内容变宽
+
+===== 2026-08-05 =====
+
+类型：新增功能 / 优化
+
+内容：登录界面全面改版——背景图换为 figure/sign1.png（浅色紫调图，去掉原深蓝渐变遮罩），登录卡片改为右侧对齐（sm 以上 pr-12/lg:pr-24 留白）叠加在背景右侧近白斜切留白区；卡片改纯净白底（bg-white/95 + rounded-2xl + shadow-lg）；标题「用户登录」（text-2xl font-bold text-indigo-950）；用户名/密码框由 Naive UI 输入框改为原生 input（左侧 User/钥匙图标、border-slate-200、focus 紫色光圈 ring-purple-500/20、密码框保留眼睛切换）；新增「记住密码」复选框（accent-purple-600，勾选后账号密码存 localStorage 回填，未勾选清除）；登录按钮改紫色满宽长按钮（bg-purple-600 hover:700 active:800）；底部新增「还没有账号？立即注册」链接（点击 toast 提示测试阶段未开放注册）；删除左侧品牌白字文案（浅色背景上不可读）
+
+涉及文件：web/frontend/src/views/LoginView.vue
+
+验证：npm run build 零类型错误；6006 服务新构建（index-Dq8IgqlH.js），/figure/sign1.png 200 可访问；浏览器无痕窗口打开 http://localhost:6006 检查视觉效果、记住密码回填、协议弹窗与登录流程
+
+===== 2026-08-05 =====
+
+类型：优化
+
+内容：登录卡片 4 点细节调整——（1）卡片加宽（max-w-420px→440px）、内边距加大（p-8→p-10）、表单纵向间距拉开（space-y-4→space-y-6）、输入框与按钮内边距加高（py-3→py-3.5）；（2）标题重构：品牌标语「律策智枢 LawPilot · 可信法律智能问答平台」移至卡片最上方做品牌 Header（text-xl font-bold tracking-wide text-indigo-950），下方紧跟主标题「用户登录」（text-2xl font-bold text-purple-900）；（3）删除底部测试账号提示行；（4）卡片细节：加 backdrop-blur-sm + shadow-xl + border-slate-100 细边框，与背景图斜切浅色块融合
+
+涉及文件：web/frontend/src/views/LoginView.vue
+
+验证：npm run build 零类型错误；6006 服务新构建（index-DPkasRtt.js），无痕窗口打开 http://localhost:6006 检查视觉效果
+
+===== 2026-08-05 =====
+
+类型：修复 / 优化
+
+内容：登录界面 3 点调整——（1）品牌标语「律策智枢 LawPilot · 可信法律智能问答平台」移出登录卡片（置于卡片外上方做页面级 Header，text-xl font-bold tracking-wide text-indigo-950）；（2）修复图标显示位置：用户名/密码图标与眼睛按钮改用 flex 布局——图标与输入框共用一个带边框的 flex 容器（边框与 focus-within 紫色光圈在父容器上），图标、输入框、眼睛按钮是同一方框内的子元素，物理上不可能渲染到方框外（原 absolute 定位在用户浏览器中出现偏移）；（3）卡片加长：内边距 p-10→p-12、标题下间距 mb-6→mb-10、表单间距 space-y-6→space-y-8、输入框与按钮内高 py-3.5→py-4、注册链接上间距 mt-6→mt-10，卡片高度约 455px→500px，内部输入框同步加高
+
+涉及文件：web/frontend/src/views/LoginView.vue
+
+验证：npm run build 零类型错误；6006 服务新构建（index-CJx9GDBh.js）；headless 渲染 DOM 确认品牌标语在卡片外、flex 同框容器生效；无痕窗口打开 http://localhost:6006 检查
+
+
+
+===== 2026-08-05 =====
+
+类型：优化
+
+内容：登录界面统一蓝色主题——紫色系全部改为蓝色系（blue-600/blue-900 等 Tailwind 默认 blue 色板）：主标题 text-purple-900→text-blue-900，用户名/密码输入框 focus 光圈 focus-within:border-purple-600 + ring-purple-500/20→blue 对应，眼睛按钮 hover:text-purple-600→hover:text-blue-600，记住密码勾选 accent-purple-600→accent-blue-600，登录按钮 bg-purple-600 hover:purple-700 active:purple-800→bg-blue-600 hover:bg-blue-700 active:bg-blue-800，注册链接 text-purple-600→text-blue-600；布局、字号、间距等其他样式一律不动
+
+涉及文件：web/frontend/src/views/LoginView.vue
+
+验证：npm run build 零类型错误；6006 服务新构建（index-BdUxPrD7.js）；无痕窗口打开 http://localhost:6006 检查登录页为蓝色系
+
+
+
+===== 2026-08-05 =====
+
+类型：新增功能 / 优化
+
+内容：问答主界面一体化三栏浅色重构（蓝色主调）——（1）左侧会话栏：深蓝渐变改浅灰底（bg-slate-50 border-r border-slate-200），宽度 240→260px，新建会话改深蓝主按钮（bg-blue-600），选中项 bg-white + shadow-sm + 左侧蓝条（border-l-4 border-blue-600）；（2）中间对话区：背景 bg-slate-100/50，顶部新增固定标题 Header（当前会话标题 + 核验状态卡片：核验中灰卡 / 完成蓝卡「高可信 · N 处法条已核验」），空会话欢迎页改白底卡片；（3）AI 回复重构为单层白底卡片（rounded-xl bg-white p-6 shadow-sm），取消多重外框嵌套：卡片头部 = ⚖️天平头像 + 律策智枢 LawPilot + 金/绿渐变评分徽章（TrustBadge 改为 bg-gradient-to-r from-amber-400 to-green-500「★ 综合可信分 85.8 - 高可信」，核验中为灰底徽章）；【结论】淡蓝块（bg-blue-50/60 border-l-4 border-blue-600 rounded-r-lg p-4），【法律分析】行高 1.7，【依据法条】法典小卡片（bg-slate-50 rounded-lg + BookOutline 图标）；（4）底部输入框改居中悬浮式（max-w-3xl rounded-2xl shadow-lg，去掉顶部边框），卡片底部整合两个微型 Toggle（RAG 检索 / 自一致性评估）+ 淡灰小字「回答由 AI 生成，仅供参考」；（5）右侧评估面板加宽至 340px 白底：信任环保留放大（96px、数字 text-3xl），徽章/建议/元信息合并为短评行「高可信 · N 处法条已核验」，加权贡献条改柔和蓝绿渐变进度条（from-blue-500/60 to-green-500/60、贡献分蓝色加粗），六维雷达图网格线淡灰（stroke-slate-200 系）、数据区半透明蓝填充（fill-blue-500/20、stroke-blue-600）、高度 210→240px + 半径 68% 防维度标签重叠；所有浅色容器补 dark: 变体保证深色主题下可读
+
+涉及文件：web/frontend/src/views/ChatView.vue, web/frontend/src/components/layout/SessionSidebar.vue, web/frontend/src/components/layout/DetailPanel.vue, web/frontend/src/components/chat/ChatMessage.vue, web/frontend/src/components/chat/TrustBadge.vue, web/frontend/src/components/chat/AnswerContent.vue, web/frontend/src/components/chat/ChatInput.vue, web/frontend/src/components/detail/TrustEvalPanel.vue, web/frontend/src/components/detail/RadarChart.vue
+
+验证：npm run build 零类型错误；curl 确认 6006 服务新构建（index-BdUxPrD7.js == dist，StaticFiles 动态读盘无需重启后端）；无痕窗口登录 root/123456 后检查三栏配色、AI 卡片结构、悬浮输入框、评估面板评分环/贡献条/雷达图，并完成一轮真实问答验证流式输出与核验刷新
+
+
+
+===== 2026-08-06 =====
+
+类型：优化
+
+内容：聊天界面细节调整——删除顶栏「可信法律问答」徽章；删除聊天区用户/AI 头像；用户气泡内边距调近（px-4 py-3 → px-3 py-2.5）；AI 回答【结论】【法律分析】【依据法条】去方框去底色，统一纯文字标题样式；输入框宽度与消息气泡对齐（max-w-3xl → max-w-[min(900px,88%)]，收起右栏自动变宽）；输入区顶部加半透明渐变遮罩过渡
+
+涉及文件：AppHeader.vue, ChatMessage.vue, AnswerContent.vue, ChatInput.vue
+
+验证：npm run build 零错误；curl http://localhost:6006/ui/ 返回 index-DbBrBlaS.js 与 dist 一致；无痕窗口人工核对视觉效果
+
+
+
+===== 2026-08-06 =====
+
+类型：优化
+
+内容：聊天界面第二轮调整——删除 AI 回答卡片头部「律策智枢 LawPilot」与「★ 综合可信分」徽章；【结论】【法律分析】【依据法条】标题左侧分别添加对勾/天平/法典小图标；输入框改为满宽贴边（去掉 mx-auto 居中与 900px 上限），左右边缘与消息气泡对齐，收起右侧评估面板时同步自适应变宽；删除上轮误加的顶部渐变遮罩
+
+涉及文件：ChatMessage.vue, AnswerContent.vue, ChatInput.vue
+
+验证：npm run build 零错误；curl http://localhost:6006/ui/ 返回 index-CQrq8dQ-.js 与 dist 一致；无痕窗口人工核对视觉与交互
+
+--------------------------------------------------------------------------------
+
+===== 2026-08-06 =====
+
+类型：新增功能
+
+内容：阶段八主线·模型层升级——多模型注册表（src/llm/model_registry.py：7 个模型 qwen3.7-plus/qwen-turbo/qwen3.7-max/deepseek-v4-flash-0731/deepseek-v4-pro/kimi-k2.6/glm-5.2，共用百炼 DASHSCOPE_API_KEY）+ 统一模型接口（src/llm/base.py）；APIClient 改按请求传 model_id（per-model enable_thinking 降级、错误文案泛化）；QwenModel 按注册表分发、按 base_url 缓存客户端；后端新增 GET /api/models（模型目录+离线引擎就绪检测），chat 请求体支持 model/global_model（Auto 解析：前端设置面板 → .env DEFAULT_API_MODEL），SSE 首事件必发 meta 携带实际模型名；修复 config API_MODEL 硬编码（.env 覆盖无效）；前端新增 ModelSelector 两级选择器（离线调用/API 调用，离线未就绪置灰+原因提示）与 SettingsModal（全局默认模型），消息气泡展示模型名，修复非法律回答覆盖 meta 的 bug；实测全部模型支持 enable_thinking=False（关闭思考后 GLM 等第三方模型不再空回答、token 消耗大降）
+
+涉及文件：src/config.py, src/llm/model_registry.py, src/llm/base.py, src/llm/api_client.py, src/llm/qwen_model.py, src/pipeline/answer_pipeline.py, src/uncertainty/self_consistency.py, web/backend/schemas.py, web/backend/main.py, web/frontend/src/（api/types.ts, api/misc.ts, stores/models.ts, stores/settings.ts, stores/sessions.ts, components/chat/ModelSelector.vue, components/common/SettingsModal.vue, components/layout/AppHeader.vue, components/chat/ChatInput.vue, components/chat/ChatMessage.vue, views/ChatView.vue）, .env.example
+
+验证：GET /api/models 返回 7 模型+离线状态；流式指定 deepseek-v4-flash-0731/glm-5.2 等正常回答（done 事件含 model_id/model_name）；model=auto + global_model=qwen-turbo 实际走 qwen-turbo；非法模型/离线调用返回 400 中文提示；同步验证 rag 命中时自一致性采样沿用同一模型（[API 用量] 打印一致）；npm run build 零类型错误；浏览器手动切换模型对比回答正常
+
+
+
+===== 2026-08-06 =====
+
+类型：修复 + 优化
+
+内容：多模型接入后的三处问题修复与前端调整——1) 修复可信核验一直显示「核验中 · 初步回答已生成」且详情不刷新：后台核验线程（BackgroundTasks 线程池）用 asyncio.run 新建事件循环广播 WebSocket 结果，与主循环绑定的连接不兼容（attached to a different loop）导致结果永远送不到前端；改为服务启动时绑定主循环（lifespan 里 bind_main_loop）+ run_coroutine_threadsafe 调度回主循环广播；前端核验失败防呆：收到 verification_error 时消息 verification_status 置 error（types 类型补 'error'），面板退出「核验中」展示已有初步评估；2) 删除中栏顶部标题栏（会话标题与「引用核验中…」状态卡片，只留对话内容）；3) 输入区布局：模型选择器与发送/停止按钮移至卡片右下角，输入框上方不再显示模型选择行，「回答由 AI 生成，仅供参考」移至输入卡片外底部居中；4) 模型选择面板精简：引擎选择仅保留「离线调用/API 调用」两个选项（删除「本地 Qwen2.5-7B · 数据不出本机」「云端大模型 · 7 款可选」副标题），离线未就绪红字（未就绪:未检测到可用CUDA GPU）改为悬停方框内显示，模型名下方说明文字（Auto 的「跟随全局默认」、各模型价格档位）全部删除改悬停 title 显示定位介绍
+
+涉及文件：web/backend/verification_worker.py, web/backend/main.py, web/frontend/src/views/ChatView.vue, web/frontend/src/components/chat/ChatInput.vue, web/frontend/src/components/chat/ModelSelector.vue, web/frontend/src/api/types.ts
+
+验证：npm run build 零类型错误；后端重启后流式问答正常（meta 携带模型名/120 chunk/done 带 message_id），WebSocket 3 秒内收到 verification_complete（可信分 82.6、4 处引用核验），总耗时 14s——修复前该推送永远收不到
+
+--------------------------------------------------------------------------------
+
+===== 2026-08-07 =====
+
+类型：新增功能
+
+内容：模型选择器供应商 logo——新增 scripts/download_model_logos.py 从官方渠道（GitHub 官方组织头像/官网 favicon，ICO 自动经 PIL 转 PNG）下载 4 个品牌 logo 到 web/frontend/public/logos/（qwen/deepseek/kimi/glm.png，对应 7 个模型的品牌映射：qwen 系 3 个、deepseek 系 2 个、kimi、glm）；ModelSelector.vue 顶部摘要按钮与模型列表（含 Auto 行）在名称前展示品牌 logo（import.meta.env.BASE_URL 兼容 dev /ui 生产路径），缺图时 @error 自动隐藏不破坏文字展示，离线调用时摘要按钮显示锁图标
+
+涉及文件：scripts/download_model_logos.py, web/frontend/src/components/chat/ModelSelector.vue
+
+验证：脚本运行成功且 4 张图均为有效 PNG（PIL 检查尺寸）；npm run build 零类型错误；dist/logos/ 下 4 张图已复制，/ui/logos/qwen.png 与新版 index-*.js 均 200（StaticFiles 实时读盘，无需重启后端）；浏览器强刷后模型列表与顶部按钮显示品牌 logo，切换模型 logo 跟随变化
+
+--------------------------------------------------------------------------------
+
+===== 2026-08-07 =====
+
+类型：修复
+
+内容：GLM 供应商 logo 下载错误——原从 zhipuai GitHub 组织下载的是全灰空占位图（仅 1.5KB），改为智谱官方开源组织 zai-org 的头像（GLM 系列模型的官方发布方，460x460 RGBA 有效 logo）；同步修正下载脚本中 GLM 的来源（zhipuai 头像为空占位图、zhipuai.cn 官网 favicon 返回 HTML，均不可用，仅保留 zai-org）
+
+涉及文件：web/frontend/public/logos/glm.png, scripts/download_model_logos.py
+
+验证：PIL 检查新图 460x460 RGBA 非空；ASCII 渲染确认 Z 形品牌标识；已同步 dist/logos/glm.png，服务端 /ui/logos/glm.png 返回 200 且字节数由 1532 变为 8570；浏览器强刷后模型列表 GLM 显示正确 logo
+
+--------------------------------------------------------------------------------
+
+===== 2026-08-07 =====
+
+类型：优化
+
+内容：前端三处细节优化——1) 模型选择器 Auto 行的 logo 改为专属标识（渐变圆底+白色星光图标，代表「智能自动选择」），不再绑定默认模型（qwen）品牌 logo；2) 详情面板收起后（头部「收起」按钮），右侧边缘中部悬浮半圆展开按钮（fixed 贴屏幕右缘、垂直居中、hover 变品牌蓝），点击重新展开面板；3) 回答正文「依据法条」章节开启条号高亮：MarkdownRenderer 新增可选 prop highlight-article，通过 markdown-it 自定义 inline 规则把「第X条」（阿拉伯/中文数字）渲染为品牌蓝加粗（nowrap 防行尾断行），其余章节与全局渲染不受影响
+
+涉及文件：web/frontend/src/components/chat/ModelSelector.vue, web/frontend/src/components/layout/DetailPanel.vue, web/frontend/src/components/common/MarkdownRenderer.vue, web/frontend/src/components/chat/AnswerContent.vue
+
+验证：npm run build 零类型错误；新产物 index-Cr8Ovx-X.js 服务端 200 且 index.html 已引用（StaticFiles 实时读盘无需重启后端）；浏览器强刷后依次检查：模型选择器 Auto 行显示渐变星光标识、收起详情面板后右缘出现展开按钮且点击可重新展开、提问后「依据法条」内《劳动法》第三十一条等条号为品牌蓝加粗
+
+--------------------------------------------------------------------------------
+
+===== 2026-08-07 =====
+
+类型：修复
+
+内容：三处遗留问题修复——1) 模型选择器摘要按钮：选 Auto 时只显示「Auto」+ 渐变星光标识（原显示「Auto · Qwen3.7 Plus」+ 默认模型品牌 logo），具体模型名只在选定具体模型时显示；2) 详情面板收起后点悬浮按钮重新展开时不再显示空态：detailPanel store 新增 openWithLatest 动作（自动选中当前会话最后一条 AI 回答并切到可信分析 tab），展开按钮改调该动作（原 close 会把 selectedMsgId 清成 null 且展开按钮只设 isOpen，导致面板空态需再点消息才显示）；3) 法条条号高亮不生效：根因是 markdown-it 的 text 规则会把整段普通文本一次性收集、自定义 inline 插件规则（注册在 emphasis 前）永远无法命中「第X条」（Node 实测三种写法均未命中）；改为渲染后文本替换——md.render 输出 HTML 后用正则把「第X条」包上 span.article-no（命中加粗/列表/多行任意位置），再经 DOMPurify 消毒（span+class 在白名单内）
+
+涉及文件：web/frontend/src/components/chat/ModelSelector.vue, web/frontend/src/stores/detailPanel.ts, web/frontend/src/components/layout/DetailPanel.vue, web/frontend/src/components/common/MarkdownRenderer.vue
+
+验证：Node 实测替换方案在纯文本/加粗/**列表**/多行四种场景均输出 span.article-no；npm run build 零类型错误；新产物 index-UuH9EClx.js 服务端 200 且 index.html 已引用；浏览器强刷后：选 Auto 摘要按钮显示星光+「Auto」、收起面板后展开自动显示最新回答可信分析、依据法条内条号为品牌蓝加粗
+
+--------------------------------------------------------------------------------
+
+===== 2026-08-07 =====
+
+类型：优化
+
+内容：三处前端细节优化——1) 依据法条的法律名称（如《劳动法》）与条号同款高亮（品牌蓝加粗）并额外加斜体：MarkdownRenderer 渲染后替换新增《[^《》]+》正则（先替换法律名称再替换条号，二者互不重叠），新增 span.law-name 样式；2) 回答左下角模型角标：Auto 模式下显示「Auto」而非后端解析后的实际模型名——消息 meta 新增 requested_model 字段（发起时 settings.apiModel 快照），ChatView 在 meta/onDone/onFallback 各写入处透传，角标据此显示（悬停 title 保留「Auto · 实际使用 X」便于查看真实模型，历史消息无该字段按原样显示）；3) 暗色主题两处白底修复：左侧「新建会话」按钮补 dark:bg-slate-700/dark:text-slate-200/dark:border-slate-600/dark:hover:bg-slate-600；用户提问气泡补 dark:bg-slate-700/dark:text-slate-100（原固定浅蓝底+继承暗色浅色文字导致内容看不清）
+
+涉及文件：web/frontend/src/components/common/MarkdownRenderer.vue, web/frontend/src/api/types.ts, web/frontend/src/views/ChatView.vue, web/frontend/src/components/chat/ChatMessage.vue, web/frontend/src/components/layout/SessionSidebar.vue
+
+验证：Node 实测替换逻辑在纯文本/加粗/**列表**/多行/长法律名称（《中华人民共和国劳动法》）五种场景均同时输出 span.law-name 与 span.article-no；npm run build 零类型错误（vue-tsc 通过）；新产物 index-sgbQJa-i.js 服务端 200 且 index.html 已引用（StaticFiles 实时读盘无需重启）；浏览器强刷后：依据法条内《劳动法》为品牌蓝加粗斜体、第三十一条仍为品牌蓝加粗；选 Auto 提问后左下角角标显示「Auto」（悬停可见实际模型名）；切换暗色主题后新建会话按钮与用户气泡均为深色底浅色字
+
+--------------------------------------------------------------------------------
+
+===== 2026-08-07 =====
+
+类型：修复
+
+内容：两处联动的核验/会话 bug——1) 引用核验结果丢失卡死：根因是 sessions store 的 updateMessage 只在「当前会话」内查找消息，而核验经 WS 异步返回（约 5~30 秒），期间用户切到别的会话时结果到达却找不到消息而被丢弃，消息永远停在「核验中」（后端日志证实广播成功但前端不应用，切会话场景必现）。修复：updateMessage 改为跨会话查找（消息 id 全局唯一，纯超集行为安全），并新增 applyVerificationResult / applyVerificationError 两个跨会话 action（WS 广播与面板自愈共用），ChatView 的 onComplete/onError 改走这两个 action；2) 切换会话时右侧详情面板不跟随：selectedMsgId 仍指向旧会话消息（面板跨会话搜索导致残留旧内容）。修复：ChatView 监听 currentSessionId 变化，自动选中新会话最新一条法律回答展示核验详情（detail.autoShow），新会话无法律回答则清空选择显示空态（detailPanel 新增 clearSelection action）；3) 自愈重连：DetailBody 监听选中的消息，若仍是「核验中」自动重连核验 WS（后端 task_registry 对已完成任务立即重放结果），页面刷新/错过广播的历史卡死消息一点即恢复
+
+涉及文件：web/frontend/src/stores/sessions.ts, web/frontend/src/stores/detailPanel.ts, web/frontend/src/views/ChatView.vue, web/frontend/src/components/detail/DetailBody.vue
+
+验证：npm run build 零类型错误（vue-tsc 通过）；新产物 index-Bq_WIZhG.js 已被服务端 index.html 引用（StaticFiles 实时读盘无需重启）；浏览器强刷后：提问后核验期间切换到其他会话再切回，核验结果正常显示（不再卡「核验中」）；切换会话右侧面板自动显示新会话最新回答的核验详情；历史卡死消息点击后自动恢复
+
+===== 2026-08-08 =====
+
+类型：修复
+
+内容：恢复多模态文档上传与可信分角标两项功能（多模型前端重构时丢失的 UI 接线）——1) 文档上传：api/misc.ts 新增 uploadDocument（multipart 原生 fetch + normalizeError 错误归一）与 fetchSupportedFormats；ChatInput.vue 新增「📎 上传文档」按钮与待发送附件列表（解析中/字数/移除，最多 5 个）；ChatView.vue 接线 ask 流程——解析中附件提示等待、仅上传文档自动以「请分析以上上传的文档内容…」提问（displayQuery 显示为「（基于上传文档的分析请求）」）、附件随用户消息展示文件名+字数、发送后清空（隐私确认未通过时保留）；2) 可信分角标：ChatMessage.vue 接入长期未引用的 TrustBadge.vue，恢复「★ 综合可信分 82 - 高可信」金绿渐变角标与「⚠ 含已废止法条」警告角标（核验中显示灰色动态徽章）。后端未改动（/api/documents/extract、user_documents 注入、六维评分本就在位）
+
+涉及文件：web/frontend/src/api/misc.ts, web/frontend/src/components/chat/ChatInput.vue, web/frontend/src/views/ChatView.vue, web/frontend/src/components/chat/ChatMessage.vue
+
+验证：npm run build 零类型错误；后端实测：POST /api/documents/extract 解析 txt 成功（53 字），POST /api/chat 带 user_documents 提问「这份合同有什么风险条款？」返回 intent=legal_qa、回答结合合同内容、六维可信评估完整（overall_score 82.3 / 高可信，六维雷达 69.5/88/92/75/95/85，法条溯源 5 条）
+
+--------------------------------------------------------------------------------
+
+===== 2026-08-09 =====
+
+类型：修复
+
+内容：上传文档内容模型读不到的真正根因——意图路由误判丢弃文档。排查过程：前端上传/解析/组装/缓存全链路验证通过，后端诊断日志证实 user_documents 已到达（22945/34538 字文档均收到），但回答仍不引用；定位到 classify_intent：用户问「帮我分析一下文档内容」这类无法律关键词的请求被兜底判为 general_non_legal，而 generate_answer_stream 的非法律分支显式置 context_docs=None，用户文档随上下文一起被丢弃（模型完全看不到文档，只能答法律套话）。修复：intent_router.classify_intent 新增 has_documents 参数（greeting 之后优先判断），携带用户文档即强制判 legal_qa（0.85，理由「携带用户上传文档，按文档分析处理」），answer_pipeline 的 run/prepare_context 两处调用传入 bool(user_documents)；非法律分支仅保留给真正的寒暄/非法律请求
+
+涉及文件：src/pipeline/intent_router.py, src/pipeline/answer_pipeline.py
+
+验证：重启后端后复现原失败场景（上传 txt + 提问「请帮我分析一下这份文档的内容」无法律关键词）：SSE meta 事件 intent=legal_qa（confidence 0.85、reason 携带用户上传文档），回答完整引用文档内容（Vue 3/FastAPI/多模态/六维可信评估等文档原文内容，且诚实指出该文档为技术说明不适用合同类法条）；回归：法律关键词提问（违约金/仲裁）+ 文档仍正常引用（回答含「五万元」「仲裁」）
+
+--------------------------------------------------------------------------------
+
+===== 2026-08-09 =====
+
+类型：优化
+
+内容：两处改进——1) 文档分析场景（上传非法律文档）：此前携带文档一律走法律流程，回答硬套【结论】【法律分析】【依据法条】三段式并罗列检索到的无关法条（如上传《项目改进指南.txt》答出一堆不适用法条，噪音大易误导）。修复：answer_pipeline 新增 _is_document_analysis 判定（文档文本与提问均不含法律关键词即判定为文档分析场景），此时跳过 RAG 检索（不产生无关法条）+ 改用 qwen_model 新增的文档分析专用 system prompt（客观总结文档要点；文档涉法则仍按三段式引用直接相关法条）；intent 保持 legal_qa（前端判定与详情面板不受影响）。前端配套：RAG 未命中/纯文档分析时后端不启动核验任务，ChatView onDone 清除 onMeta 写入的「核验中」状态并仅在 done.trust 存在时连接核验 WS（修复消息永久显示「引用核验中…」）；2) 回答卡片底部操作栏新增反馈/复制/重新生成：ChatMessage 收藏按钮旁新增 👍 有帮助 / 👎 需改进（记录进消息 feedback.rating 字段随会话持久化、再次点击取消、选中高亮）、复制（navigator.clipboard + 失败提示）、↻ 重新生成（ChatView onRegenerate：移除旧回答→新占位→按原问题重跑流水线；纯文档提问还原为实际请求；文档上下文从消息附件保存的截断文本回传——MessageAttachment 新增 text 字段，ask 时按后端 12000 字符上限截断存储避免 localStorage 膨胀）；3) 输入框 placeholder 精简：删除「；可附加文档辅助分析」
+
+涉及文件：src/pipeline/answer_pipeline.py, src/pipeline/intent_router.py, src/llm/qwen_model.py, web/frontend/src/components/chat/ChatMessage.vue, web/frontend/src/views/ChatView.vue, web/frontend/src/stores/sessions.ts, web/frontend/src/components/chat/ChatInput.vue
+
+验证：后端脚本实测三场景——非法律文档+通用提问：intent=legal_qa、rag_used=False、回答以「该文档为技术类文档，不涉及具体法律分析」开头并按要点总结文档、无三段式无法条；涉法文档（劳动合同）+法律提问：rag_used=True、三段式+引用《劳动合同法》行为不变；纯法律提问无文档：行为不变。npm run build 零类型错误（首次报 MessageAttachment 未导入，补 import 后通过）；新产物 index-C_i5315h.js 已被服务端 index.html 引用（重启后端后生效）；浏览器强刷后：回答底部操作栏出现 👍/👎/复制/↻ 重新生成、点赞高亮且再点取消、复制 toast、重新生成后回答更新（带文档回答仍引用文档内容）、输入框提示词已精简
+
+===== 2026-08-09 =====
+
+类型：优化
+
+内容：AI 回答气泡底部操作栏 UI 精简与图标化——1) 删除「★ 综合可信分」徽章（TrustBadge.vue 移除可信分/核验中徽章，仅保留「⚠ 含已废止法条」安全警告；核验中状态由操作栏「引用核验中…」文字提示）；2) 删除「已核验」字样（核验完成后不再显示任何核验状态字样）；3) 模型角标增加品牌 logo：logo 映射逻辑抽为公共模块 utils/modelLogo.ts（ModelSelector 与 ChatMessage 共用，按 model_id 前缀映射 qwen/deepseek/kimi/glm 四品牌，Auto 模式显示实际模型的品牌 logo，缺图自动隐藏）；4) 点赞/点踩/复制/重新生成/收藏五个按钮改为纯图标（@vicons/ionicons5：ThumbsUp/ThumbsDown/Refresh/Copy/Star），无文字、悬停（title + 灰底加深）显示功能提示，浅灰圆角按钮组容器参考 FontAwesome 风格，选中态实心着色（赞绿/踩红/收藏黄）
+
+涉及文件：web/frontend/src/components/chat/ChatMessage.vue, web/frontend/src/components/chat/TrustBadge.vue, web/frontend/src/components/chat/ModelSelector.vue, web/frontend/src/utils/modelLogo.ts（新增）
+
+验证：npm run build 零类型错误（新产物 index-D0DUdUxH.js 已被服务端 index.html 引用，HTTP 200）；后端健康检查通过；浏览器强刷后检查：气泡下方无「综合可信分」徽章、无「已核验」字样；模型名左侧显示品牌 logo（Auto 显示实际模型 logo）；五个操作按钮为纯图标，悬停出现功能提示，点赞选中变绿实心、收藏选中变黄实心
+
+--------------------------------------------------------------------------------
+
+===== 2026-08-09 =====
+
+类型：修复
+
+内容：意图路由改为「以提问为准」——上传非法律文档 + 无法律词提问（如「文档内容说了什么」）此前因「携带文档强制 legal_qa」+ 文档文本关键词扫描误判（技术日志含「法条」等词即判涉法）而走法律流程：RAG 注入无关法条、强制三段式、生成评估详情。修复：classify_intent 签名 has_documents → user_documents，判定只看提问（提问含法律关键词 → legal_qa；提问无法律词 + 携带文档 → general_non_legal 文档分析模式）；非法律分支注入文档全文（修复 context_docs=None 丢弃文档的根源结构）+ 用文档分析提示词（不套三段式、不罗列法条、结尾引导法律咨询）；get_system_prompt 的 document_mode 判定前置；删除 _is_document_analysis。前端零改动（general_non_legal 自动不生成评估详情）。新增 pytest 单测（tests/test_intent_router.py 9 例 + tests/test_qwen_prompts.py 5 例）保护路由与提示词选择
+
+涉及文件：src/pipeline/intent_router.py, src/pipeline/answer_pipeline.py, src/llm/qwen_model.py, tests/test_intent_router.py（新增）, tests/test_qwen_prompts.py（新增）, tests/conftest.py（新增）, requirements.txt
+
+验证：pytest 14 例全过；集成脚本三场景 PASS（非法律文档+通用提问 → general_non_legal/文档分析提示词/注入文档/无 RAG/无评估 meta；合同+法律提问 → legal_qa 不变；纯法律提问不变）+ 真实生成一次回答「该文档为技术类开发日志，不涉及具体法律分析」要点总结 + 结尾引导法律咨询、无三段式；demo.py 法律提问回归三段式 + 六维评估正常；浏览器强刷后回归清单（非法律文档 → 无评估详情入口）
+
+--------------------------------------------------------------------------------
+
+===== 2026-08-09 =====
+
+类型：修复
+
+内容：三个 bug——1) 非法律问题回答气泡下方永久显示「引用核验中…」：onMeta 无条件写入 verification_status=pending，但 onDone 的 non_legal 分支合并 meta 时未清除该状态（旁边的「RAG 未命中」分支已清除）。修复：non_legal 分支补 verification_status: undefined（后端对非法律回答本就不启动核验任务）；2) Auto 模型回答时气泡下方 Auto 显示千问 logo：modelBadgeLogo 按后端解析后的实际 model_id 映射品牌 logo。修复：requested_model==='auto' 时与模型选择器一致显示星光渐变图标（SparklesOutline，不绑定任何品牌）；3) 「新建会话」两个示例问题非三段式——根因一：意图路由关键词表缺「借贷/借款/贷款/利率/利息/债务/欠款/担保/抵押/定金/彩礼/遗嘱/遗产」，「民间借贷利率的合法上限是多少？」被误判为 general_non_legal 走通用回复（问题本身是标准法律问题，程序漏词）；根因二：查询重写器对「离婚」类提问生成扩展查询「离婚 夫妻共同财产 子女抚养」，命中财产分割条款相关度（74-77%）高于用户原话命中的冷静期条款（民法典第1077条，66%），多查询结果按相关度全局排序把 1077 挤出 top-5 → 模型「检索不到法条依据」。修复：_retrieve_articles 改为逐查询合并（主查询=用户原话改写优先，扩展查询按序补位，跨查询按法律名+条号去重，提取为可单测的 _merge_query_results）。两个示例问题均保留（验证为程序问题而非问题本身不涉法）
+
+涉及文件：web/frontend/src/views/ChatView.vue, web/frontend/src/components/chat/ChatMessage.vue, src/pipeline/intent_router.py, src/pipeline/answer_pipeline.py, tests/test_intent_router.py, tests/test_retrieval_merge.py（新增）
+
+验证：pytest 19 例全过（新增关键词 1 例 + 合并策略 4 例）；demo.py 两问题真实生成——「民间借贷利率的合法上限是多少？」：intent=legal_qa、检索到民法典 680/674/670 等借款条款、三段式 + 六维评估 84.1 高可信；「离婚冷静期是多长时间？」：检索第一名即 1077 冷静期条款（66%）、回答「离婚冷静期为30日」+ 三段式 + 六维评估 82.3 高可信；npm run build 零类型错误；重启后端后浏览器回归（非法律提问不再显示「引用核验中…」；Auto 回答角标为星光图标；两个示例问题均三段式）
+
+--------------------------------------------------------------------------------
+
+
+
+--------------------------------------------------------------------------------
+
+===== 2026-08-10 =====
+
+类型：新增功能
+
+内容：智能体功能第一阶段——1) src/config.py 新增智能体配置段：AGENT_ENABLE_TOOLS（工具调用开关，仅 API 引擎生效）、AGENT_MAX_TOOL_ROUNDS（最大工具轮次防死循环）、AGENT_DECISION_MAX_TOKENS（每轮工具决策最大 token）、AGENT_TOOL_ARG_MAX_LEN（工具参数长度上限）；2) src/llm/base.py 新增模型层工具契约：ToolCall（id/name/arguments + to_dict）与 ToolDecision（text + tool_calls 默认空列表）两个 dataclass，BaseLLMModel 追加三个抽象方法 complete_with_tools / complete_stream_with_tools（yield ("text", str) 文本块 + 流末 ("tool_calls", List[ToolCall]) 事件；本地引擎抛 NotImplementedError）与 generate_stream_messages（按原始消息列表流式生成）。本任务仅定义契约，实际逻辑由后续任务实现
+
+涉及文件：src/config.py, src/llm/base.py, tests/test_model_tool_contract.py（新增）
+
+验证：pytest tests/test_model_tool_contract.py -q → 3 passed（先确认失败 ImportError 再实现后通过）；全量 pytest tests/ -q → 22 passed 无回归；提交 832a4ae
+
+
+
+===== 2026-08-10 =====
+
+类型：新增功能
+
+内容：智能体功能第二阶段——任务调度器（src/agents/task_scheduler.py）：把 legal_qa 意图细分为 legal_qa / contract_review / validity_check 三种任务类型，确定性规则分类（不用大模型，快稳便宜可解释），回退安全（规则不命中一律落回 legal_qa，最坏情况=现状不退化）。时效查询法律名动态取自 data/law_registry.json（不硬编码废止清单）；合同审查区分「携带文档+审查信号」（0.85）与「无文档强个人审查意图」（0.8，输出引导上传）。新增 pytest 单测 8 例（tests/test_task_scheduler.py），其中 test_registry_driven_law_names 用临时注册表写入「专利法」验证不硬编码。src/agents/__init__.py 为空文件
+
+涉及文件：src/agents/__init__.py（新增）, src/agents/task_scheduler.py（新增）, tests/test_task_scheduler.py（新增）
+
+验证：先确认失败（ModuleNotFoundError: No module named 'src.agents'）再实现；tests/test_task_scheduler.py -q → 8 passed；全量 pytest tests/ -q → 30 passed 无回归；提交 1d1ffb3
+
+
+
+===== 2026-08-10 =====
+
+类型：修复
+
+内容：任务调度器审查修复（协调者复查反馈 3 项 + 连带 1 项）——1) 无文档合同审查正则收紧：_CONTRACT_REVIEW_NO_DOC_RE 去掉裸「条款」命中（「劳动合同试用期条款违法怎么办？」此前误判合同审查），改为审查动词约束（帮我审/审一下/帮忙审/帮我看看.*合同协议/合同协议.*审查风险把关）；2) 携带文档分支去裸词：_CONTRACT_REVIEW_RE 去掉裸「风险/条款/合规」，要求与合同协议词或审查动词共现（上传判决书问「有什么风险」不再误判）；3) classify_task 入口加强制 intent 守卫（intent.intent != legal_qa → 直接返回 legal_qa，docstring 承诺落地为代码）；4) 连带发现：I3 守卫暴露意图路由漏词——「婚姻法」「专利法」不在 _LEGAL_KEYWORDS，导致「婚姻法现在还有效吗？」被判 general_non_legal、「专利法还有效吗？」被判寒暄（len≤8），时效查询在真实调用链上不可达，intent_router 补「婚姻」「专利」两词根（与表内「继承」「侵权」风格一致）；测试同步追加 3 例保护（I1/I2/I3 各一），既有 8 例与 3 例合同测试全部保持通过
+
+涉及文件：src/agents/task_scheduler.py, src/pipeline/intent_router.py, tests/test_task_scheduler.py
+
+验证：追加测试先确认失败（3 failed, 8 passed）再修复；tests/test_task_scheduler.py -q → 11 passed；全量 pytest tests/ -q → 33 passed 无回归（test_intent_router.py 9 例不受影响）；冒烟验证 8 个边界场景全部符合预期；本轮未提交 git（待协调者复查后统一提交）
+
+
+
+===== 2026-08-10 =====
+
+类型：修复
+
+内容：意图路由补词收尾（协调者复查确认）——上一轮只补「婚姻」「专利」，注册表 9 部废止法律中「收养法」「物权法」仍漏判（「收养法还有效吗？」会被判 general_non_legal、时效查询功能不可达）。_LEGAL_KEYWORDS 追加「收养」「物权」，与「婚姻」「专利」同一注释块（废止法律时效查询场景）。核对 tests/test_intent_router.py 9 例无相关断言、无冲突
+
+涉及文件：src/pipeline/intent_router.py
+
+验证：全量 pytest tests/ -q → 33 passed 无回归；冒烟：收养法/物权法/婚姻法时效查询真实链均 intent=legal_qa → validity_check 且 law_name 正确回传；提交 06bc39c（本轮修改日志由 Task 12 统一提交，未纳入该提交）
+
+
+
+===== 2026-08-10 =====
+
+类型：新增功能
+
+内容：智能体功能 Task 4——合同审查管线 + 文档引文核验。1) 新增 src/citation_verifier/document_quotes.py：DocumentQuoteVerifier 纯字符串逐字比对回答中引用的用户文档原文（「…」/“…”/《…》三种引号样式，文档条款信号词过滤法条名误报），输出 document_quote_checks（text/found/verdict/in_document），防止模型编造合同条款被误当文档事实；2) CitationVerifier.verify 增加 user_documents 参数，报告新增 document_quote_checks 键（无文档时为 None）；3) qwen_model 新增 _SYSTEM_PROMPT_CONTRACT 合同审查专用提示词（【合同风险清单】+【总体评价】结构，要求引号内逐字复述文档原文、仅引用参考法条），get_system_prompt("contract_review") 分支；4) answer_pipeline run() 内三处 verify 调用与 run_verification 一处统一传 user_documents。实测发现（简报之外）：百炼模型引号输出风格为弯引号“…”而非「…」，简报原始引号样式会漏检（真实回答 document_quote_checks 恒为空），已追加弯引号样式 + 单测保护。真实 API 集成验证：上传含试用期/工资/违约金条款的合同 txt → /api/documents/extract → /api/chat 带 user_documents → 回答含【合同风险清单】【总体评价】结构，document_quote_checks 正确核出 3 条文档原文（verified）+ 法条原文等非文档引文（document_mismatch）
+
+涉及文件：src/citation_verifier/document_quotes.py（新增）, src/citation_verifier/citation_verifier.py, src/llm/qwen_model.py, src/pipeline/answer_pipeline.py, tests/test_document_quotes.py（新增）, tests/test_qwen_prompts.py
+
+验证：严格 TDD——先写失败测试（ModuleNotFoundError 与断言失败）再实现；tests/test_document_quotes.py + tests/test_qwen_prompts.py → 12 passed；全量 pytest tests/ -q → 54 passed 无回归；真实 API 集成验证通过（任务类型 contract_review、风险清单结构、document_quote_checks 3 verified）；提交见 Task 4 报告
+
+
+
+===== 2026-08-10 =====
+
+类型：新增功能
+
+内容：智能体功能 Task 5——工具注册表与执行器（src/agents/tools.py）：2 个 function calling 工具 schema（search_articles 检索法条 / check_law_validity 查询时效）+ execute_tool 统一分发入口；参数清洗（去空白、剔控制字符、截断至 AGENT_TOOL_ARG_MAX_LEN=100）；search_articles 走向量检索（相关度阈值过滤 + article_key 去重）；check_law_validity 走 LawValidityService.check_citation；未知工具/空参数返回错误结果不抛异常
+
+涉及文件：src/agents/tools.py（新增）, tests/test_tools.py（新增）
+
+验证：严格 TDD——先确认失败（ModuleNotFoundError）再实现；tests/test_tools.py -q → 6 passed；全量 pytest tests/ -q → 39 passed 无回归；提交 0fe6e83（本轮修改日志由 Task 12 统一提交，未纳入该提交）
+
+
+
+===== 2026-08-10 =====
+
+类型：新增功能
+
+内容：智能体功能 Task 6——模型层工具调用实现：api_client 新增 complete_with_tools（非流式工具决策，temperature 固定 0.0，tool_calls 参数 JSON 解析容错）与 complete_stream_with_tools（流式决策，重试语义与 complete_stream 一致）；qwen_model 新增 supports_tools / complete_with_tools / complete_stream_with_tools（本地引擎抛 NotImplementedError）与 generate_stream_messages（按原始消息列表流式生成）；连带修复 _resolve_model 对 provider=="local" 合成 local ModelSpec（本地分支实际不可达的既有 bug）
+
+涉及文件：src/llm/api_client.py, src/llm/qwen_model.py, tests/test_model_tools.py（新增）
+
+验证：严格 TDD——实现前 5 failed 确认失败；实现后 tests/test_model_tools.py + tests/test_qwen_prompts.py → 10 passed；全量 pytest tests/ -q → 44 passed 无回归；提交 7547ce8（本轮修改日志由 Task 12 统一提交，未纳入该提交）
+
+
+
+===== 2026-08-10 =====
+
+类型：新增功能
+
+内容：智能体功能 Task 7——工具循环引擎：src/agents/trace.py 定义 ToolTraceStep（step/tool_name/arguments/result_summary/success/cost_ms）与 AgentStatusEvent（running/done/error/generating）；src/agents/agent_loop.py 的 AgentToolLoop 实现流式/非流式工具循环（上限 AGENT_MAX_TOOL_ROUNDS=3，每轮决策 token 上限 512）：工具决策轮 yield 状态事件、最终回答轮流式输出；NotImplementedError（本地引擎）自动降级普通生成；轮次耗尽/工具失败兜底不中断、失败步骤记录进轨迹；工具检索结果还原为 Document（元数据含 law_name/article_num/status 等 6 键，供核验合并）；审查修复：降级路径累积 answer（I-1，run() 不再返回空回答）
+
+涉及文件：src/agents/trace.py（新增）, src/agents/agent_loop.py（新增）, tests/test_agent_loop.py（新增）
+
+验证：严格 TDD——先确认失败（ModuleNotFoundError）再实现，修正简报 2 处矛盾后 tests/test_agent_loop.py -q → 6 passed；全量 pytest tests/ -q → 60 passed 无回归；提交 68a1fbf（本轮修改日志由 Task 12 统一提交，未纳入该提交）
+
+
+
+===== 2026-08-10 =====
+
+类型：新增功能
+
+内容：智能体功能 Task 8——流水线与 SSE 集成。1) src/knowledge_base/retrieval_utils.py 新增 merge_unique_docs（工具检索结果按（法律名,条号）去重并入初始检索结果）；2) answer_pipeline.run() 新增 agent_tools 参数：开启且模型支持函数调用且任务为 legal_qa 时走 AgentToolLoop（惰性导入规避循环引用：agent_loop 顶部回引本模块 PipelineContext），返回字典追加 task / tool_trace；3) web/backend/main.py SSE 端点新增智能体分支：meta 之后按 use_agent 判断走 loop.stream，工具状态以 agent_status 事件推送，done 事件追加 task / validity_evidence / tool_trace（工具检索到的法条并入 ctx.retrieved_docs 供后台引用核验使用）；4) schemas.ChatResponse 追加 tool_trace 可选字段（task / validity_evidence 为 Task 3 已有）
+
+涉及文件：src/pipeline/answer_pipeline.py, src/knowledge_base/retrieval_utils.py, web/backend/main.py, web/backend/schemas.py, tests/test_retrieval_merge.py
+
+验证：严格 TDD——新用例先确认失败（ImportError）再实现；全量 pytest tests/ -q → 61 passed 无回归；真实 API 集成验证四场景：多法条问题（glm-5.2）触发 9 次 agent_status、tool_trace 非空、三段式回答；普通问题零回归（无 agent_status、tool_trace 空）；时效快路径 meta/done 均带 validity_evidence、回答不套三段式；同步 /api/chat 返回 tool_trace 数组与 task。简报之外发现：默认模型 qwen3.7-plus 在当前 legal_qa 系统提示词下不主动调用工具（模型自主决策，流式/非流式 API 契约经强制指令探测均正常），kimi 轮次耗尽兜底偶发空回答（Task 7 循环逻辑边界）
+
+
+
+===== 2026-08-10 =====
+
+类型：新增功能
+
+内容：智能体功能 Task 9——前端 SSE agent_status 消费与生成中状态行 + 时效来源标注。1) types.ts 新增 AgentStatusEvent / ToolTraceStep 接口，MessageMeta 追加 task_type / tool_trace / validity_evidence / agent_status（瞬态），DoneEvent / MetaEvent 追加 task_type / validity_evidence / tool_trace，SSEEventMap 追加 agent_status 事件；2) useChatStream 新增 onAgentStatus 回调与事件分发；3) ChatView 接线：onAgentStatus 把最新工具状态写入消息 meta（展开合并），onMeta / onDone 三分支（non_legal / trust / else）/ onFallback 同步降级路径统一落盘 task_type / validity_evidence / tool_trace 并清理瞬态 agent_status；4) ChatMessage 在回答内容上方渲染智能体状态行（● 正在检索法条…→✓ 命中 N 条法条，done 后消失）与时效查询来源标注（◈ 来源：法律时效注册表）。简报之外发现：后端 meta/done/同步响应均只发嵌套 task 对象（task.task_type）而无顶层 task_type 字段，取值处做双源兼容（meta.task_type ?? meta.task?.task_type），保证 meta.task_type 一定落盘（Task 10 依赖）
+
+涉及文件：web/frontend/src/api/types.ts, web/frontend/src/composables/useChatStream.ts, web/frontend/src/views/ChatView.vue, web/frontend/src/components/chat/ChatMessage.vue
+
+验证：npm run build vue-tsc 零类型错误；真实 API 三场景（glm-5.2 多法条问题触发 9 次 agent_status + tool_trace 4 步；「你好」无 agent_status；「婚姻法现在还有效吗？」meta/done 均带 validity_evidence）；/ui/ 新产物 200；验证完毕已停服务；提交见 Task 9 报告（本轮修改日志由 Task 12 统一提交，未纳入该提交）
+
+===== 2026-08-10 =====
+
+类型：新增功能
+
+内容：智能体功能 Task 10——工具轨迹面板与文档引文核验展示。1) 新建 web/frontend/src/components/detail/ToolTracePanel.vue：详情面板「工具轨迹」tab 内容，展示每轮工具名/成功失败/参数 JSON/结果摘要/耗时（key 用 step-tool_name，同轮多工具 step 重复为已知设计）；2) DetailBody 接入：tabs 区在有 tool_trace 时条件显示「工具轨迹」tab，内容区顺序改 v-if trust / v-else-if articles / v-else-if trace / v-else verification（verification 保持兜底），detailPanel store 的 DetailTab 类型追加 trace；3) CitationVerificationPanel 展示文档引文核验：types.ts 的 CitationVerification 补 document_quote_checks 类型（text/found/verdict/in_document），「无数据」判断同时考虑 docQuotes，显式引用卡片后追加「文档引文核验」区块（verified → 与上传文档原文一致 / 其他 → 未找到，warning 样式）
+
+涉及文件：web/frontend/src/components/detail/ToolTracePanel.vue（新增）, web/frontend/src/components/detail/DetailBody.vue, web/frontend/src/components/detail/CitationVerificationPanel.vue, web/frontend/src/api/types.ts, web/frontend/src/stores/detailPanel.ts, web/frontend/dist
+
+验证：npm run build vue-tsc 零类型错误（首轮 2 错：DetailTab 缺 trace、meta 可能 undefined，已修）；真实 API 三场景——① glm-5.2「工伤认定申请时效和劳动仲裁时效分别是多少？」触发 9 次 agent_status、done.tool_trace 4 步全 success（step 号跨工具重复、args/result_summary/cost_ms 齐全）；② 合同 txt + 「这份合同有什么风险条款？」task=contract_review，document_quote_checks 11 条（verified 原文一致与 document_mismatch 未找到混合，WS 核验路径经 ctx.user_documents 确认同链路）；③ 普通问题 tool_trace 为空 → trace tab 隐藏；/ui/ 新产物 200 且 bundle 含新组件；验证完已停服务；提交 a832200（本轮修改日志由 Task 12 统一提交，未纳入该提交）
+
+
+
+===== 2026-08-10 =====
+
+类型：新增功能
+
+内容：智能体功能 Task 11——效果对比评测：新增 data/benchmark/agent_compare.json（10 道对比题：7 道带 gold_law/gold_article 法条题 + 3 道时效类题）；run_legal_trust_benchmark.py 新增 --mode agent（pipeline.run 传 agent_tools=True，rows 追加 tool_call_count / elapsed_ms，trust 取值 None 判空保护，summary 追加 avg_tool_calls）；真实对比跑：full avg_trust 83.29 vs agent 83.2、gold_citation_recall 0.7 vs 0.7（零回归）；默认模型 qwen3.7-plus 对 10 道单轮题未触发工具调用（avg_tool_calls=0.0，属预期内的可能结果，如实记录）
+
+涉及文件：data/benchmark/agent_compare.json（新增）, scripts/run_legal_trust_benchmark.py, data/benchmark/report_full.json, data/benchmark/report_agent.json
+
+验证：mock 冒烟 --mode agent --mock 报告生成（avg_tool_calls=0.0）；真实模式 full/agent 各 10 题对比跑通过（首跑网络中断重试后成功，validity 题走废止核验路径无崩溃）；pytest tests/ -q → 63 passed 无回归；提交 e33e96e（本轮修改日志由 Task 12 统一提交，未纳入该提交）
+
+
+
+===== 2026-08-10 =====
+
+类型：新增功能
+
+内容：智能体（Agent）能力落地——任务调度器（合同审查管线输出结构化风险清单 + 文档引文核验；时效查询管线直查注册表出确定性结论）；工具调用引擎（检索法条 / 查询时效 2 个工具，循环上限 3 轮，SSE agent_status 状态事件，前端工具轨迹面板）；effect 对比评测（--mode agent）
+
+涉及文件：src/agents/（task_scheduler/tools/agent_loop/trace）、src/llm/（base/api_client/qwen_model）、src/pipeline/answer_pipeline.py、src/citation_verifier/（document_quotes + verify 扩展）、web/backend/（main.py/schemas.py）、web/frontend/（types/useChatStream/ChatView/ChatMessage/ToolTracePanel/DetailBody/CitationVerificationPanel）、scripts/run_legal_trust_benchmark.py、data/benchmark/agent_compare.json
+
+验证：pytest 全绿；npm run build 零类型错误；三类问题（多法条/合同/时效）真实 API 集成验证通过；对比报告产出
+
+
+
+===== 2026-08-10 =====
+
+类型：修复 / 优化
+
+内容：最终审查波合并前小修复。1) 无文档合同审查礼貌引导（F-1）：answer_pipeline 在 task=contract_review 且无 user_documents 时短路返回固定引导文案「请上传合同文件后再提问……」，run() 与 prepare_context 两处零 LLM 调用（新增 PipelineContext.short_circuit_text 字段 + generate_answer_stream 开头短路直出，SSE 流式路径同样不调模型）；2) ToolTracePanel 轨迹 key 追加索引防同轮同工具碰撞（F-2）；3) 判决书 + 泛用风险词用例钉住 I2 正则（F-3）；4) tools.py：store=None 时 search_articles 返回「检索服务不可用」+ 工具描述去掉「指定法律名称可提高精度」改为「可选，指定缩小范围」（描述与实现一致）（F-4）；5) CLAUDE.md 与指南 8.2 声明 Web 端离线调用暂缓（F-5）；6) .gitignore 忽略 data/benchmark/mock_*.json（F-6）
+
+涉及文件：src/pipeline/answer_pipeline.py, tests/test_contract_guidance.py（新增）, web/frontend/src/components/detail/ToolTracePanel.vue, tests/test_task_scheduler.py, src/agents/tools.py, CLAUDE.md, docs/项目改进指南.txt, .gitignore, web/frontend/dist
+
+验证：pytest tests/ -q → 66 passed（63 + 合同引导 3 条新增 + I2 钉住 1 条，原 63 条含新增前基线）；npm run build vue-tsc 零类型错误；提交见最终审查波提交
+
+===== 2026-08-11 =====
+
+类型：新增功能
+
+内容：多用户账号体系（改进指南阶段三落地 + 扩展）——①修复登出 bug：旧版登出先清空会话数据（sessions.$reset）且异步登出未 await 导致路由守卫弹回、需点两次才退出，现改为先 await 登出再跳转且登出不再清数据；②服务端会话管理：新建 user_store.py（pbkdf2 哈希密码 + 每用户 API Key + 种子账号 root/user1/user2）、session_manager.py（Token 24h TTL 滑动续期 + JSON 持久化 + 多端共存）、user_data.py（每用户会话/收藏/资料 JSON 读写）；③新增注册接口 /api/auth/register（用户名+密码，规则校验、重名 409、成功自动登录）与用户数据接口 /api/user/data、/api/user/profile；④每用户 API Key 透传：ChatRequest 增加可选 token，后端解析用户自配 Key 沿 pipeline→model→api_client 全程透传（按 (base_url, api_key) 缓存客户端，并发不串 Key），未配置回退服务端 .env Key（root 默认）；⑤前端：登录页注册模式 + 测试账号提示、useSync.ts 双写同步（登录拉取恢复/3 秒防抖整包提交/首次登录本地回写迁移）、设置面板 API Key 输入、聊天请求携带 token
+
+涉及文件：新建 web/backend/user_store.py, session_manager.py, user_data.py, web/frontend/src/api/user.ts, composables/useSync.ts；修改 web/backend/main.py, schemas.py, src/config.py, src/llm/qwen_model.py, src/agents/agent_loop.py, src/pipeline/answer_pipeline.py, src/uncertainty/self_consistency.py, web/frontend/src/{api/auth.ts,api/types.ts,stores/auth.ts,stores/sessions.ts,views/LoginView.vue,components/layout/AppHeader.vue,components/common/SettingsModal.vue,App.vue,router/index.ts}, .gitignore, docs/律策智枢_LawPilot_项目介绍.txt, README.md
+
+验证：后端接口集成测试（登录/注册/409/400/401/数据存取/登出吊销/重启恢复/多端共存）+ 真实服务端到端（root 问答、新用户回退服务端 Key、自配 Key 问答、无效 Key 报中文错误、清空 Key 恢复、登出后重登数据恢复、流式 SSE 带 token）+ 前端 npm run build 通过
+
+===== 2026-08-11 =====
+
+类型：新增功能
+
+内容：设置面板精简与功能扩充——①删除三处说明文字（模型价格/能力小字、API Key 四行说明、底部 Auto 提示框），界面简洁化；②API Key 输入框占位符改为 Key 形式（sk-*******）；③设置面板分区重构为「问答偏好 / 模型与 API Key / 账户 / 关于」四区：新增 NLI 引用核验开关与自一致性采样次数（2/3/5，此前 store 有字段无界面）；新增修改密码（校验旧密码、重哈希、吊销该用户其他设备 Token，当前设备保持登录）；新增清空全部个人数据（二次确认，清会话/收藏/资料，保留账号与 API Key）；新增关于区块（账号/模型数/离线引擎/服务与法律库状态）
+
+涉及文件：web/backend/main.py, web/backend/schemas.py, web/backend/session_manager.py（新增 revoke_others）, web/backend/user_store.py（新增 change_password）, web/backend/user_data.py（新增 clear_user_data）, web/frontend/src/components/common/SettingsModal.vue（分区重构）, web/frontend/src/api/auth.ts, web/frontend/src/api/user.ts
+
+验证：后端单元自测（change_password/revoke_others/clear_user_data）+ 真实接口测试（旧密码错 400/新密码短 400/改密踢其他设备且当前保持/新密码登录/清空后数据为空且 Key 保留/未登录 401）+ 前端 npm run build 通过 + 服务重启为干净种子账号状态
+
+
+
 
 --------------------------------------------------------------------------------
 ===== 2026-08-11 =====
 类型：文档更新
-内容：结合修改日志与当前代码全量重写三份文档——①《法信通_LawTrust_项目介绍.txt》侧重整体技术架构（多模型注册表/智能体/多用户体系）、重要模块、登录使用与环境配置，测试用例章节移除（仅保留演示数据说明）；②《法信通_Web端功能展示清单.txt》按功能模块（登录注册/主界面/模型选择/设置面板/会话管理/法律问答/文档上传/输入守卫/意图路由/详情四 Tab/消息操作/收藏资料/多账号）逐一介绍功能与操作，并配套 15 个维度约 60 条编号测试用例与 10 分钟演示路线；③README.md 同步更新架构、快速开始、文档索引与目录结构；④docs/测试文件/ 新增借条.txt（借贷借条）、技术说明文档.txt（非法律文档）、借条图片.png（OCR 测试图，PIL 生成），与既有合同案例1/2.txt 组成完整上传测试数据
-涉及文件：docs/法信通_LawTrust_项目介绍.txt, docs/法信通_Web端功能展示清单.txt, README.md, docs/测试文件/（借条.txt、技术说明文档.txt、借条图片.png 新增）
+内容：结合修改日志与当前代码全量重写三份文档——①《律策智枢_LawPilot_项目介绍.txt》侧重整体技术架构（多模型注册表/智能体/多用户体系）、重要模块、登录使用与环境配置，测试用例章节移除（仅保留演示数据说明）；②《律策智枢 LawPilot_Web端功能展示清单.txt》按功能模块（登录注册/主界面/模型选择/设置面板/会话管理/法律问答/文档上传/输入守卫/意图路由/详情四 Tab/消息操作/收藏资料/多账号）逐一介绍功能与操作，并配套 15 个维度约 60 条编号测试用例与 10 分钟演示路线；③README.md 同步更新架构、快速开始、文档索引与目录结构；④docs/测试文件/ 新增借条.txt（借贷借条）、技术说明文档.txt（非法律文档）、借条图片.png（OCR 测试图，PIL 生成），与既有合同案例1/2.txt 组成完整上传测试数据
+涉及文件：docs/律策智枢_LawPilot_项目介绍.txt, docs/律策智枢 LawPilot_Web端功能展示清单.txt, README.md, docs/测试文件/（借条.txt、技术说明文档.txt、借条图片.png 新增）
 验证：文档与代码核对——API 端点列表与 web/backend/main.py 路由逐一比对一致；测试用例与修改日志记录的功能行为一致；测试图片经 PIL 生成并确认可读取
---------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+
 ===== 2026-08-11 =====
 类型：文档更新
-内容：优化《法信通_LawTrust_项目介绍.txt》表述——①去掉 AI 腔与割裂句（如「提供可交互的演示环境」「与通用聊天机器人不同」），改为按「为什么做→怎么做→带来什么」的叙述逻辑组织；②新增第二章「大模型与智能体（Agent）如何融合」：讲清从被动问答到主动调工具的演进、主管-专家任务调度、工具调用循环（2 工具/3 轮上限/回退安全），以及融合带来的收益（更专业/更确定/更可信/零回归）；③同步设置面板新分区（六区）至项目介绍、Web 端功能展示清单（功能 08/09、目录、演示路线汇总）与 README（每用户 API Key 位置描述）
-涉及文件：docs/法信通_LawTrust_项目介绍.txt, docs/法信通_Web端功能展示清单.txt, README.md
+内容：优化《律策智枢_LawPilot_项目介绍.txt》表述——①去掉 AI 腔与割裂句（如「提供可交互的演示环境」「与通用聊天机器人不同」），改为按「为什么做→怎么做→带来什么」的叙述逻辑组织；②新增第二章「大模型与智能体（Agent）如何融合」：讲清从被动问答到主动调工具的演进、主管-专家任务调度、工具调用循环（2 工具/3 轮上限/回退安全），以及融合带来的收益（更专业/更确定/更可信/零回归）；③同步设置面板新分区（六区）至项目介绍、Web 端功能展示清单（功能 08/09、目录、演示路线汇总）与 README（每用户 API Key 位置描述）
+涉及文件：docs/律策智枢_LawPilot_项目介绍.txt, docs/律策智枢 LawPilot_Web端功能展示清单.txt, README.md
 验证：文档内核对——设置面板分区描述与前端 SettingsModal.vue 六区导航一致；Agent 章节事实（工具名/轮次上限/评测数字 83.2 vs 83.29）与 src/agents/、docs/智能体架构说明.txt 一致
 ===== 2026-08-11 =====
 类型：文档更新
 内容：项目介绍文档表述再调整——去除上一版引入的口语化/答辩式描述（如「站得住脚」「一本正经地编造法条」「主动找吃的」「敢信、敢用」等比喻与抒情句），统一为正式技术文档语气；概述章改为「平台定位→法律场景差异→可信链路各环节→智能体引入」的客观陈述；Agent 章改为「融合动机→任务调度→工具调用→融合收益」的说明结构；同步修正一处笔误（时效查询条目中「模��」→「模型」）
-涉及文件：docs/法信通_LawTrust_项目介绍.txt
+涉及文件：docs/律策智枢_LawPilot_项目介绍.txt
 验证：全文检索无口语化残留（敢信/站得住脚/一本正经/被投喂/主动找吃/干巴巴等）；章节结构与事实内容与上一版一致
 
 ===== 2026-08-11 =====
 类型：文档新增
 内容：新增《技术效果对比与数据处理改进方案.txt》，第一部分设计 Inference 效果评测体系（A 检索质量/B 生成质量/C 可信安全/D 性能成本/E 对照组 5 组指标 + 4 个对比矩阵 + 6 类可视化图表 + 落地步骤），第二部分设计数据工程完善方案（P0~P3 法律入库规划、清洗/元数据/父子分块/质检版本管理流水线、司法解释与判例处理、闭环验证表、D1~D3 分阶段实施计划）。
 涉及文件：docs/技术效果对比与数据处理改进方案.txt（新增）
-验证：数据实测支撑（6 部法律 1950 条，超 500 字 3 条；测试集 10 题中 4 题引用法律不在库中）
+验证：数据实测支撑（6 部法律 1950 条，超 500 字 3 条；测试集 10 题中 4 题引用法律不在库中）
+
+
+===== 2026-08-21 =====
+类型：优化
+内容：数据工程修复（对应《技术效果对比与数据处理改进方案》第二部分）——① 修复刑法第452条"本法自年 月 日起施行"日期缺失（联网核实为 1997 年 10 月 1 日）；② 补齐 8 部法律缺失的"第一章 总则"标题（公司法/消保法/道交法/社保法/劳争议裁法/工伤条例/劳合同法实施条例 + 刑法第一编总则与第一章、第二编分则规范化）；③ 婚姻法全角空格标题规范化；④ md_converter 解析器升级：章/编/节正则允许"第X章"后无空格、识别无 ## 前缀的裸标题行（防被吞进条文内容）、全角空格归一化、<br> 残留清洗为换行、标题内连续空格压缩；⑤ law_parser category 优先用 registry 细分类别；⑥ KNOWN_LAWS 改为从 data/processed 动态构建（新增法律免改代码）；⑦ build_knowledge_base.py 新增 --reset 参数（构建前清空旧向量库，防新旧数据混合）；⑧ 修复 law_repeals.json 中"劳动争议解释（一）"被误判整部废止的矛盾条目（repeal_extractor 增加"部分废止"条款识别与机构前缀归一化）；⑨ 删除 data/raw/.ipynb_checkpoints 残留。
+涉及文件：src/data_processing/md_converter.py, law_parser.py, repeal_extractor.py, src/knowledge_base/law_name_resolver.py, scripts/build_knowledge_base.py, data/raw/*.md（8 部补章节+刑法452修复+婚姻法标题）, data/processed/*.json（重新转换）
+验证：python scripts/qa_data.py 全过（33 部 5329 条，0 污染）；层级覆盖率从 11/33 提升到 27/33（剩余 6 部为官方无章节的司法解释，正常）；python scripts/build_knowledge_base.py --reset 重建后检索验证（废止婚姻法被过滤、章节信息进入检索结果）；内容污染条文从数十条降至 0
+
+===== 2026-08-23 =====
+类型：新增功能
+内容：扩充评测测试集（对应《技术效果对比与数据处理改进方案》第一部分 1.6 步骤 1）——① legal_qa_gold 从 10 题扩至 30 题（保留原 qa001-010 不动，新增 qa011-030：basic 8 / tricky 9 / composite 3 三档难度，覆盖 18 部法律），新题均标注 difficulty 与 note，综合题新增 gold_articles 数组（38+46 解除与经济补偿、14+16 工伤排除、46+47 补偿标准）；② 新建 retrieval_gold.json 35 题（rg001-035，{prompt, gold_law, gold_article, category}，覆盖刑法/公司法/消保法/道交法/劳动合同法/劳动法/工伤条例/社保法/民诉法/民法典等 16 部法律，含 3 条口语化 tricky 检索题）；③ 所有 gold 答案均与 data/processed 法条原文逐一核对；④ 新增 scripts/check_benchmark_retrieval.py（自检测试集每题 gold 条文的检索命中率 Hit@1/3/5）。
+涉及文件：data/benchmark/legal_qa_gold.json（扩充）, data/benchmark/retrieval_gold.json（新增）, scripts/check_benchmark_retrieval.py（新增）
+验证：check_benchmark_retrieval.py 自检——retrieval_gold Hit@5 = 35/35（100%）、Hit@1 = 45.7%（真实反映 bge 检索水平）；legal_qa_gold Hit@5 = 29/30（96.7%），唯一 miss 为 qa023 设计意图题（故意引用已废止的婚姻法，验证系统能否识别废止转向民法典）；run_legal_trust_benchmark.py --mock 两个数据集均跑通（count=30/35，gold_citation_recall=1.0）
+
+===== 2026-08-31 =====
+类型：新增功能
+内容：技术效果对比评测落地（对应《技术效果对比与数据处理改进方案》第一部分）——① 升级 run_legal_trust_benchmark.py：新增 --model/--top-k/--min-relevance/--samples 参数（矩阵2/3/4），接入 A 组检索指标（Hit@1/3/5、MRR、无检索率、gold 相关度）、B1 标准答案匹配率（子串/括号前缀/bge 语义）、B3 忠实度（复用 implicit_verifier NLI 论断核验）、D 组成本指标（usage_log.jsonl 落盘 + 估算单价折算，按模型过滤防并行串扰）；支持 retrieval_gold 纯检索评测；② api_client._log_usage 增加 token 用量落盘；③ 新增 scripts/render_benchmark_report.py（ECharts 六图 + 逐题对比卡单文件 HTML 报告）；④ 修正 qa007 answer 字段；⑤ 修复 Windows torch 段错误（KMP_DUPLICATE_LIB_OK=TRUE，OpenMP DLL 冲突）
+涉及文件：scripts/run_legal_trust_benchmark.py, scripts/render_benchmark_report.py（新增）, src/llm/api_client.py, data/benchmark/legal_qa_gold.json, docs/competition/*.json（12 份报告）, docs/competition/report_latest.html, docs/competition/report_20260831.html
+验证：mock 四模式回归通过；真实 API 全量实验完成——矩阵1 消融（no_rag/rag/full/agent × 30题 × qwen3.7-plus）+ 矩阵2 多模型（7 模型 × 30 题 full 模式）+ retrieval_gold 35 题纯检索；结论：RAG 提升答案匹配率 +6.6pp、核验闭环提升忠实度 +19pp；qwen-turbo 性价比最优（0.3厘/题）；agent 模式 30 题工具调用为 0（单轮简答模型不主动调工具）；发现 no_rag 信任分虚高（评分器未核验计满分）、意图路由误判刑事行为描述题两个口径问题
+
+===== 2026-08-31（二）=====
+类型：优化
+内容：技术对比报告改为逐图 PNG 导出（响应报告评审反馈）——① 重写 scripts/render_benchmark_report.py：弃用 ECharts 单文件 HTML，改用 matplotlib 输出 6 张 PNG 到 docs/figure/（fig0 指标总览表 / fig1 六维可信雷达 / fig2 系统消融对比 / fig3 成本效果对比 / fig4 模型指标热力图 / fig5 检索命中率），删除图 6 逐题对比卡；② 修复消融序列 bug：旧版 pick() 只按 mode 过滤未按模型过滤，6 个模型的 full 报告混入导致"完整流水线"在总览表/图 2/图 5 重复出现，现消融类图表仅取默认模型 qwen3.7-plus 四模式报告，retrieval_gold 基线去重；③ 图 1 雷达维度改中文标签（真实性/安全性/公平性/鲁棒性/隐私保护/伦理合规），与 Web 端 LegalTrustScorer 口径一致（报告为 30 题平均）；④ 图 3 散点改双面板横向条形图（左单题成本/右信任分含 80 分参考线，按信任分排序），解决标签遮挡与空白过多；⑤ 图 4 热力图强制显示全部行/列名与单元格数值；⑥ 每张图加副标题说明对比口径与结论；⑦ 旧 HTML 报告移入 docs/competition/archive/。
+涉及文件：scripts/render_benchmark_report.py（重写）, docs/figure/*.png（新增 6 张）, docs/competition/archive/*.html（归档 3 份）
+验证：脚本运行生成 6 张 PNG 并逐张目检——中文正常、无遮挡、消融组每模式仅一行、热力图列名齐全

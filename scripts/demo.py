@@ -1,5 +1,5 @@
 """
-End-to-end demo of LawTrust (法信通) Chinese Legal AI system.
+End-to-end demo of LawPilot (律策智枢) Chinese Legal AI system.
 
 Usage:
     python scripts/demo.py
@@ -99,7 +99,7 @@ def main() -> None:
     parser.add_argument("--consistency", action="store_true")
     args = parser.parse_args()
 
-    print("=== 法信通 LawTrust Demo ===")
+    print("=== 律策智枢 LawPilot Demo ===")
     print("正在加载模型，请稍候 …\n")
 
     embedder = LawEmbedder()

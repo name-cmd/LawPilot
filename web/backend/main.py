@@ -1,5 +1,5 @@
 """
-LawTrust (法信通) FastAPI backend.
+LawPilot (律策智枢) FastAPI backend.
 """
 import asyncio
 import json
@@ -168,8 +168,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="LawTrust 法信通",
-    description="可信法律智能问答与多维可信评估平台",
+    title="LawPilot 律策智枢",
+    description="面向智慧司法的多智能体协同与全域可信核验问答平台",
     version="1.0.0",
     lifespan=lifespan,
 )

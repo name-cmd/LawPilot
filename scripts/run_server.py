@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Start LawTrust web server."""
+"""Start LawPilot web server."""
 import socket
 import sys
 from pathlib import Path
@@ -23,7 +23,7 @@ if __name__ == "__main__":
         pass
 
     print("=" * 56)
-    print("  法信通 LawTrust — 服务启动")
+    print("  律策智枢 LawPilot — 服务启动")
     print("=" * 56)
     print(f"  本机访问：  http://localhost:{PORT}")
     print(f"            http://127.0.0.1:{PORT}")

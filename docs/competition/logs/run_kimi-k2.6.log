@@ -1,0 +1,113 @@
+D:\MyProjects\LawTrust\src\knowledge_base\embedder.py:19: LangChainDeprecationWarning: The class `HuggingFaceEmbeddings` was deprecated in LangChain 0.2.2 and will be removed in 1.0. An updated version of the class exists in the `langchain-huggingface package and should be used instead. To use it run `pip install -U `langchain-huggingface` and import as `from `langchain_huggingface import HuggingFaceEmbeddings``.
+  self._embeddings = HuggingFaceEmbeddings(
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 28118.40it/s]
+D:\MyProjects\LawTrust\src\knowledge_base\vector_store.py:40: LangChainDeprecationWarning: The class `Chroma` was deprecated in LangChain 0.2.9 and will be removed in 1.0. An updated version of the class exists in the `langchain-chroma package and should be used instead. To use it run `pip install -U `langchain-chroma` and import as `from `langchain_chroma import Chroma``.
+  self._db = Chroma(
+[API 用量] kimi-k2.6: prompt=680 completion=185 total=865
+Loading weights:   0%|          | 0/393 [00:00<?, ?it/s]Loading weights: 100%|██████████| 393/393 [00:00<00:00, 26371.25it/s]
+[API 用量] kimi-k2.6: prompt=754 completion=210 total=964
+Loading weights:   0%|          | 0/393 [00:00<?, ?it/s]Loading weights: 100%|██████████| 393/393 [00:00<00:00, 25846.11it/s]
+[qa001] rank=2 match=True cite=0.6206 trust=84.6 12551.0ms
+[API 用量] kimi-k2.6: prompt=610 completion=195 total=805
+[API 用量] kimi-k2.6: prompt=724 completion=184 total=908
+[qa002] rank=1 match=True cite=0.7277 trust=86.6 15001.8ms
+[API 用量] kimi-k2.6: prompt=85 completion=159 total=244
+[qa003] rank=None match=True cite=1.0 trust=None 3938.3ms
+[API 用量] kimi-k2.6: prompt=86 completion=142 total=228
+[qa004] rank=None match=False cite=1.0 trust=None 2435.0ms
+[API 用量] kimi-k2.6: prompt=980 completion=233 total=1213
+[qa005] rank=1 match=True cite=0.6948 trust=86.0 6226.5ms
+[API 用量] kimi-k2.6: prompt=726 completion=182 total=908
+[qa006] rank=1 match=True cite=0.9 trust=89.7 7406.9ms
+[API 用量] kimi-k2.6: prompt=695 completion=560 total=1255
+[qa007] rank=1 match=True cite=0.7158 trust=81.3 10405.1ms
+[API 用量] kimi-k2.6: prompt=600 completion=236 total=836
+[qa008] rank=1 match=True cite=0.92 trust=90.0 4283.3ms
+[API 用量] kimi-k2.6: prompt=776 completion=497 total=1273
+[qa009] rank=2 match=True cite=0.7238 trust=86.5 9516.9ms
+[API 用量] kimi-k2.6: prompt=549 completion=297 total=846
+[qa010] rank=1 match=True cite=0.8261 trust=83.3 7848.8ms
+[API 用量] kimi-k2.6: prompt=694 completion=328 total=1022
+[API 用量] kimi-k2.6: prompt=812 completion=495 total=1307
+[qa011] rank=1 match=True cite=0.4353 trust=81.3 35588.7ms
+[API 用量] kimi-k2.6: prompt=543 completion=163 total=706
+[qa012] rank=1 match=True cite=0.7533 trust=87.0 4195.3ms
+[API 用量] kimi-k2.6: prompt=781 completion=360 total=1141
+[qa013] rank=1 match=True cite=0.691 trust=85.9 8834.5ms
+[API 用量] kimi-k2.6: prompt=97 completion=39 total=136
+[qa014] rank=None match=False cite=1.0 trust=None 1044.5ms
+[API 用量] kimi-k2.6: prompt=718 completion=307 total=1025
+[qa015] rank=3 match=False cite=0.7685 trust=87.3 7906.7ms
+[API 用量] kimi-k2.6: prompt=92 completion=67 total=159
+[qa016] rank=None match=False cite=1.0 trust=None 1863.4ms
+[API 用量] kimi-k2.6: prompt=683 completion=220 total=903
+[qa017] rank=1 match=True cite=0.69 trust=85.9 5505.3ms
+[API 用量] kimi-k2.6: prompt=821 completion=233 total=1054
+[qa018] rank=1 match=True cite=0.7298 trust=86.6 11548.4ms
+[API 用量] kimi-k2.6: prompt=686 completion=277 total=963
+[qa019] rank=1 match=True cite=0.7989 trust=87.8 7892.7ms
+[API 用量] kimi-k2.6: prompt=498 completion=212 total=710
+[qa020] rank=1 match=True cite=0.865 trust=89.0 3879.0ms
+[API 用量] kimi-k2.6: prompt=801 completion=649 total=1450
+[qa021] rank=1 match=True cite=0.6647 trust=85.4 11638.8ms
+[API 用量] kimi-k2.6: prompt=621 completion=232 total=853
+[qa022] rank=1 match=True cite=0.92 trust=90.0 3811.8ms
+[API 用量] kimi-k2.6: prompt=665 completion=261 total=926
+[API 用量] kimi-k2.6: prompt=731 completion=316 total=1047
+[qa023] rank=5 match=False cite=0.7634 trust=70.2 16591.7ms
+[API 用量] kimi-k2.6: prompt=96 completion=73 total=169
+[qa024] rank=None match=False cite=1.0 trust=None 2147.7ms
+[API 用量] kimi-k2.6: prompt=770 completion=314 total=1084
+[API 用量] kimi-k2.6: prompt=839 completion=292 total=1131
+[qa025] rank=1 match=True cite=0.6082 trust=84.4 18717.2ms
+[API 用量] kimi-k2.6: prompt=695 completion=343 total=1038
+[API 用量] kimi-k2.6: prompt=766 completion=327 total=1093
+[qa026] rank=1 match=True cite=0.4907 trust=82.3 21538.4ms
+[API 用量] kimi-k2.6: prompt=607 completion=315 total=922
+[qa027] rank=5 match=False cite=0.733 trust=86.7 48323.7ms
+[API 用量] kimi-k2.6: prompt=692 completion=435 total=1127
+[API 用量] kimi-k2.6: prompt=810 completion=421 total=1231
+[qa028] rank=2 match=True cite=0.5592 trust=83.5 73307.1ms
+[API 用量] kimi-k2.6: prompt=647 completion=406 total=1053
+[qa029] rank=2 match=True cite=0.94 trust=90.4 5849.9ms
+[API 用量] kimi-k2.6: prompt=683 completion=204 total=887
+[qa030] rank=1 match=True cite=0.6859 trust=85.8 4083.1ms
+Report saved: D:\MyProjects\LawTrust\docs\competition\benchmark_20260831_kimi-k2.6_full_legal_qa_gold.json
+{
+  "mode": "full",
+  "dataset": "legal_qa_gold",
+  "model": "kimi-k2.6",
+  "mock": false,
+  "count": 30,
+  "top_k": 5,
+  "min_relevance": 0.35,
+  "avg_trust_score": 85.5,
+  "avg_radar": {
+    "truthfulness": 83.74,
+    "safety": 85.28,
+    "fairness": 92.0,
+    "robustness": 75.0,
+    "privacy": 95.0,
+    "ethics": 81.0
+  },
+  "avg_consistency": null,
+  "avg_elapsed_ms": 12462.7,
+  "token_usage": {
+    "kimi-k2.6": {
+      "prompt": 23113,
+      "completion": 10369,
+      "calls": 37
+    }
+  },
+  "est_cost_yuan": 0.5422,
+  "regeneration_rate": 0.2333,
+  "gold_citation_recall": 0.9,
+  "answer_match_rate": 0.7667,
+  "avg_faithfulness": 0.6452,
+  "hit_at_1": 0.6,
+  "hit_at_3": 0.7667,
+  "hit_at_5": 0.8333,
+  "mrr": 0.6911,
+  "no_retrieval_rate": 0.1667
+}
+EXIT=0

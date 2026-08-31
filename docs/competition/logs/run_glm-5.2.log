@@ -1,0 +1,131 @@
+D:\MyProjects\LawTrust\src\knowledge_base\embedder.py:19: LangChainDeprecationWarning: The class `HuggingFaceEmbeddings` was deprecated in LangChain 0.2.2 and will be removed in 1.0. An updated version of the class exists in the `langchain-huggingface package and should be used instead. To use it run `pip install -U `langchain-huggingface` and import as `from `langchain_huggingface import HuggingFaceEmbeddings``.
+  self._embeddings = HuggingFaceEmbeddings(
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 28998.59it/s]
+D:\MyProjects\LawTrust\src\knowledge_base\vector_store.py:40: LangChainDeprecationWarning: The class `Chroma` was deprecated in LangChain 0.2.9 and will be removed in 1.0. An updated version of the class exists in the `langchain-chroma package and should be used instead. To use it run `pip install -U `langchain-chroma` and import as `from `langchain_chroma import Chroma``.
+  self._db = Chroma(
+[API 用量] glm-5.2: prompt=724 completion=293 total=1017
+Loading weights:   0%|          | 0/393 [00:00<?, ?it/s]Loading weights: 100%|██████████| 393/393 [00:00<00:00, 28995.94it/s]
+[API 用量] glm-5.2: prompt=830 completion=288 total=1118
+Loading weights:   0%|          | 0/393 [00:00<?, ?it/s]Loading weights: 100%|██████████| 393/393 [00:00<00:00, 29237.15it/s]
+[qa001] rank=2 match=True cite=0.4718 trust=81.9 17642.4ms
+[API 用量] glm-5.2: prompt=651 completion=169 total=820
+[API 用量] glm-5.2: prompt=729 completion=142 total=871
+[qa002] rank=1 match=True cite=0.52 trust=82.8 11049.3ms
+[API 用量] glm-5.2: prompt=86 completion=84 total=170
+[qa003] rank=None match=True cite=1.0 trust=None 2073.8ms
+[API 用量] glm-5.2: prompt=88 completion=60 total=148
+[qa004] rank=None match=False cite=1.0 trust=None 2676.7ms
+[API 用量] glm-5.2: prompt=1036 completion=301 total=1337
+[API 用量] glm-5.2: prompt=1107 completion=291 total=1398
+[qa005] rank=1 match=True cite=0.2961 trust=73.8 15607.0ms
+[API 用量] glm-5.2: prompt=757 completion=185 total=942
+[API 用量] glm-5.2: prompt=825 completion=198 total=1023
+[qa006] rank=1 match=True cite=0.4636 trust=81.8 9487.7ms
+[API 用量] glm-5.2: prompt=748 completion=719 total=1467
+[API 用量] glm-5.2: prompt=879 completion=634 total=1513
+[qa007] rank=1 match=True cite=0.4749 trust=77.0 39416.1ms
+[API 用量] glm-5.2: prompt=631 completion=260 total=891
+[API 用量] glm-5.2: prompt=700 completion=297 total=997
+[qa008] rank=1 match=True cite=0.5554 trust=83.4 18821.6ms
+[API 用量] glm-5.2: prompt=813 completion=747 total=1560
+[API 用量] glm-5.2: prompt=947 completion=682 total=1629
+[qa009] rank=2 match=True cite=0.5132 trust=82.7 41091.5ms
+[API 用量] glm-5.2: prompt=578 completion=383 total=961
+[API 用量] glm-5.2: prompt=672 completion=336 total=1008
+[qa010] rank=1 match=True cite=0.5856 trust=79.0 24699.4ms
+[API 用量] glm-5.2: prompt=735 completion=413 total=1148
+[API 用量] glm-5.2: prompt=873 completion=510 total=1383
+[qa011] rank=1 match=True cite=0.4433 trust=81.4 34987.2ms
+[API 用量] glm-5.2: prompt=566 completion=201 total=767
+[API 用量] glm-5.2: prompt=635 completion=195 total=830
+[qa012] rank=1 match=True cite=0.5618 trust=83.6 13033.6ms
+[API 用量] glm-5.2: prompt=835 completion=549 total=1384
+[API 用量] glm-5.2: prompt=956 completion=349 total=1305
+[qa013] rank=1 match=True cite=0.4722 trust=81.9 27010.6ms
+[API 用量] glm-5.2: prompt=100 completion=37 total=137
+[qa014] rank=None match=False cite=1.0 trust=None 1545.2ms
+[API 用量] glm-5.2: prompt=761 completion=642 total=1403
+[API 用量] glm-5.2: prompt=939 completion=461 total=1400
+[qa015] rank=3 match=False cite=0.7113 trust=86.3 28773.9ms
+[API 用量] glm-5.2: prompt=95 completion=94 total=189
+[qa016] rank=None match=False cite=1.0 trust=None 2727.9ms
+[API 用量] glm-5.2: prompt=713 completion=259 total=972
+[API 用量] glm-5.2: prompt=782 completion=218 total=1000
+[qa017] rank=1 match=True cite=0.5791 trust=83.9 15171.3ms
+[API 用量] glm-5.2: prompt=878 completion=204 total=1082
+[qa018] rank=1 match=False cite=0.7097 trust=86.2 5481.2ms
+[API 用量] glm-5.2: prompt=742 completion=458 total=1200
+[API 用量] glm-5.2: prompt=810 completion=297 total=1107
+[qa019] rank=1 match=True cite=0.6074 trust=84.4 20355.5ms
+[API 用量] glm-5.2: prompt=524 completion=186 total=710
+[API 用量] glm-5.2: prompt=605 completion=202 total=807
+[qa020] rank=1 match=True cite=0.4088 trust=80.8 14380.5ms
+[API 用量] glm-5.2: prompt=847 completion=728 total=1575
+[API 用量] glm-5.2: prompt=993 completion=745 total=1738
+[qa021] rank=1 match=True cite=0.5629 trust=83.6 38902.9ms
+[API 用量] glm-5.2: prompt=645 completion=222 total=867
+[API 用量] glm-5.2: prompt=723 completion=204 total=927
+[qa022] rank=1 match=True cite=0.2356 trust=77.7 12391.4ms
+[API 用量] glm-5.2: prompt=712 completion=451 total=1163
+[API 用量] glm-5.2: prompt=830 completion=691 total=1521
+[qa023] rank=5 match=False cite=0.5158 trust=65.7 30132.8ms
+[API 用量] glm-5.2: prompt=98 completion=69 total=167
+[qa024] rank=None match=False cite=1.0 trust=None 2309.0ms
+[API 用量] glm-5.2: prompt=809 completion=336 total=1145
+[API 用量] glm-5.2: prompt=880 completion=320 total=1200
+[qa025] rank=1 match=True cite=0.4945 trust=82.4 20532.4ms
+[API 用量] glm-5.2: prompt=746 completion=440 total=1186
+百炼 API 调用失败（APITimeoutError），3 秒后重试…
+[API 用量] glm-5.2: prompt=816 completion=415 total=1231
+[qa026] rank=1 match=True cite=0.4385 trust=81.3 84657.0ms
+[API 用量] glm-5.2: prompt=646 completion=337 total=983
+[API 用量] glm-5.2: prompt=729 completion=362 total=1091
+[qa027] rank=5 match=False cite=0.7781 trust=87.5 17865.1ms
+[API 用量] glm-5.2: prompt=732 completion=419 total=1151
+[API 用量] glm-5.2: prompt=847 completion=439 total=1286
+[qa028] rank=2 match=True cite=0.447 trust=81.5 30094.8ms
+[API 用量] glm-5.2: prompt=693 completion=516 total=1209
+[API 用量] glm-5.2: prompt=813 completion=641 total=1454
+[qa029] rank=2 match=True cite=0.1249 trust=75.7 24187.0ms
+[API 用量] glm-5.2: prompt=721 completion=210 total=931
+[API 用量] glm-5.2: prompt=789 completion=179 total=968
+[qa030] rank=1 match=True cite=0.4424 trust=81.4 12429.9ms
+Report saved: D:\MyProjects\LawTrust\docs\competition\benchmark_20260831_glm-5.2_full_legal_qa_gold.json
+{
+  "mode": "full",
+  "dataset": "legal_qa_gold",
+  "model": "glm-5.2",
+  "mock": false,
+  "count": 30,
+  "top_k": 5,
+  "min_relevance": 0.35,
+  "avg_trust_score": 81.11,
+  "avg_radar": {
+    "truthfulness": 69.78,
+    "safety": 85.28,
+    "fairness": 92.0,
+    "robustness": 75.0,
+    "privacy": 95.0,
+    "ethics": 79.0
+  },
+  "avg_consistency": null,
+  "avg_elapsed_ms": 20651.2,
+  "token_usage": {
+    "glm-5.2": {
+      "prompt": 38419,
+      "completion": 19068,
+      "calls": 54
+    }
+  },
+  "est_cost_yuan": 0.4781,
+  "regeneration_rate": 0.8,
+  "gold_citation_recall": 0.8333,
+  "answer_match_rate": 0.7333,
+  "avg_faithfulness": 0.6696,
+  "hit_at_1": 0.6,
+  "hit_at_3": 0.7667,
+  "hit_at_5": 0.8333,
+  "mrr": 0.6911,
+  "no_retrieval_rate": 0.1667
+}
+EXIT=0

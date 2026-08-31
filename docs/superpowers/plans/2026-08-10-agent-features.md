@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 为法信通实现任务编排式多智能体（合同审查 / 时效查询专用管线）与工具调用式智能体（检索法条 / 查询时效 2 个工具，循环上限 3 轮），形成「可信智能体」答辩叙事。
+**Goal:** 为律策智枢 LawPilot实现任务编排式多智能体（合同审查 / 时效查询专用管线）与工具调用式智能体（检索法条 / 查询时效 2 个工具，循环上限 3 轮），形成「可信智能体」答辩叙事。
 
 **Architecture:** 新增 `src/agents/` 智能体层——任务调度器在现有意图路由之上细分任务类型（法律问答 / 合同审查 / 时效查询，回退安全）；工具调用引擎（ReAct 简化版）挂在法律问答管线上，模型自主决定是否调用工具；所有法律类最终回答仍走引用核验 + 六维评分闭环。SSE 新增 `agent_status` 事件类型（向后兼容），前端展示生成中状态与工具轨迹。
 
@@ -458,7 +458,7 @@ def build_validity_evidence(law_name: str, validity: "LawValidityService") -> Di
 `src/llm/qwen_model.py`：在 `_SYSTEM_PROMPT_DOC_ANALYSIS` 之后追加：
 
 ```python
-_SYSTEM_PROMPT_VALIDITY = """你是法信通（LawTrust）智能助手。用户询问某部法律的时效状态（是否有效/已废止）。
+_SYSTEM_PROMPT_VALIDITY = """你是律策智枢 LawPilot智能助手。用户询问某部法律的时效状态（是否有效/已废止）。
 
 回答要求：
 - 核心结论必须以「法律时效注册表」提供的事实为准（废止日期、替代法律），
@@ -790,7 +790,7 @@ from src.citation_verifier.document_quotes import DocumentQuoteVerifier
 `src/llm/qwen_model.py`：在 `_SYSTEM_PROMPT_VALIDITY` 之前追加：
 
 ```python
-_SYSTEM_PROMPT_CONTRACT = """你是法信通（LawTrust）智能助手，专业合同审查员。用户上传了合同/协议并请求审查。
+_SYSTEM_PROMPT_CONTRACT = """你是律策智枢 LawPilot智能助手，专业合同审查员。用户上传了合同/协议并请求审查。
 
 请输出结构化风险清单，格式如下（小节标题必须保留）：
 
@@ -2597,7 +2597,7 @@ git commit -m "feat: 智能体效果对比评测（agent_compare 数据集 + --m
 - Create: `docs/智能体架构说明.txt`
 - Modify: `CLAUDE.md`（阶段八进度表）
 - Modify: `docs/修改日志.txt`（追加本次记录）
-- Modify: `docs/法信通_LawTrust_项目介绍.txt`（若其中列出了 docs 文件清单，同步追加）
+- Modify: `docs/律策智枢_LawPilot_项目介绍.txt`（若其中列出了 docs 文件清单，同步追加）
 
 - [ ] **Step 1: 更新指南 8.4 / 8.5**
 
@@ -2640,7 +2640,7 @@ git commit -m "feat: 智能体效果对比评测（agent_compare 数据集 + --m
 
 - [ ] **Step 5: 同步项目介绍**
 
-检查 `docs/法信通_LawTrust_项目介绍.txt` 是否列出 docs 文件清单（如「文档（项目介绍 / 竞赛改进方案 / 修改日志）」的列举形式），若有则把 `智能体架构说明.txt` 加入清单；README.md 若有同样列举同步处理。
+检查 `docs/律策智枢_LawPilot_项目介绍.txt` 是否列出 docs 文件清单（如「文档（项目介绍 / 竞赛改进方案 / 修改日志）」的列举形式），若有则把 `智能体架构说明.txt` 加入清单；README.md 若有同样列举同步处理。
 
 - [ ] **Step 6: 全量回归与提交**
 

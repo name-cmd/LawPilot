@@ -1,4 +1,4 @@
-# 法信通 LawTrust —— 多用户账号体系设计文档（阶段三 + 注册 + 每用户 API Key）
+# 律策智枢 LawPilot —— 多用户账号体系设计文档（阶段三 + 注册 + 每用户 API Key）
 
 - 日期：2026-08-10
 - 状态：设计定稿（使用者已批准，直接实施）
@@ -208,5 +208,5 @@ router.push('/login')        // 再跳转
   `src/pipeline/answer_pipeline.py`、`src/uncertainty/self_consistency.py`、
   `web/frontend/src/api/auth.ts`、`api/chat.ts`、`api/types.ts`、`views/LoginView.vue`、
   `components/layout/AppHeader.vue`、`components/common/SettingsModal.vue`、
-  `stores/auth.ts`、`.gitignore`、`docs/法信通_LawTrust_项目介绍.txt`、
+  `stores/auth.ts`、`.gitignore`、`docs/律策智枢_LawPilot_项目介绍.txt`、
   `docs/修改日志.txt`、CLAUDE.md 进度表（阶段三状态）

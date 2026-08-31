@@ -243,13 +243,13 @@ export function exportTrustReport(session: Session, selectedIds: Set<string>): b
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <title>法信通 · 可信评估报告</title>
+  <title>LawPilot · 可信评估报告</title>
   <style>${REPORT_PRINT_CSS}</style>
 </head>
 <body>
   <div class="report-root">
     <header class="report-header">
-      <h1>法信通 · 可信评估报告</h1>
+      <h1>律策智枢 LawPilot · 可信评估报告</h1>
       <div class="report-meta">
         对话：${escapeHtml(session.title)}<br/>
         导出人：${escapeHtml(auth.displayLabel)}<br/>
